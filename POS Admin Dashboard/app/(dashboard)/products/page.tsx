@@ -2,7 +2,22 @@
 
 import type React from "react";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import {
+  fetchProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  type Product,
+} from "@/lib/store/slices/productsSlice";
+import {
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  type Category,
+} from "@/lib/store/slices/categoriesSlice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Plus,
   Pencil,
@@ -38,48 +54,44 @@ import {
   Upload,
   Download,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
-import {
-  initialProducts,
-  productCategories,
-  productTypes,
-  type Product,
-} from "@/lib/mock-data";
-
-// Category type
-export type Category = {
-  id: string;
-  name: string;
-  description: string;
-};
-
-// Initial categories
-const initialCategories: Category[] = productCategories.map((name, index) => ({
-  id: crypto.randomUUID(),
-  name,
-  description: `Category for ${name.toLowerCase()}`,
-}));
 
 export default function ProductsPage() {
-  const [items, setItems] = useState<Product[]>(initialProducts);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const dispatch = useAppDispatch();
+  const { items, loading: productsLoading, error: productsError } = useAppSelector(
+    (state) => state.products
+  );
+  const { items: categories, loading: categoriesLoading } = useAppSelector(
+    (state) => state.categories
+  );
+
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const [type, setType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
+  useEffect(() => {
+    dispatch(fetchProducts());
+    dispatch(fetchCategories());
+  }, [dispatch]);
+
   const filtered = useMemo(() => {
     return items.filter((i) => {
+      const categoryName =
+        typeof i.category === "object" 
+          ? (i.category?.name || "")
+          : (i.category || "");
       const matchQ =
         q.trim().length === 0 ||
-        i.name.toLowerCase().includes(q.toLowerCase()) ||
-        i.sku.toLowerCase().includes(q.toLowerCase());
-      const matchCat = cat === "all" || i.category === cat;
-      const matchType = type === "all" || i.type === type;
-      return matchQ && matchCat && matchType;
+        (i.productName || "").toLowerCase().includes(q.toLowerCase()) ||
+        (i.productCode || "").toLowerCase().includes(q.toLowerCase());
+      const matchCat = cat === "all" || categoryName === cat;
+      // Note: type filter removed as backend doesn't have this field
+      return matchQ && matchCat;
     });
-  }, [items, q, cat, type]);
+  }, [items, q, cat]);
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -88,38 +100,75 @@ export default function ProductsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  function onDelete(id: string) {
-    setItems((prev) => prev.filter((p) => p.id !== id));
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this product?")) {
+      await dispatch(deleteProduct(id));
   }
+  };
 
-  function onSave(product: Product) {
-    setItems((prev) => {
-      const exists = prev.some((p) => p.id === product.id);
-      return exists
-        ? prev.map((p) => (p.id === product.id ? product : p))
-        : [{ ...product }, ...prev];
-    });
+  const handleSave = async (productData: Partial<Product> | FormData) => {
+    if (productData instanceof FormData) {
+      await dispatch(createProduct(productData));
+    } else {
+      if ((productData as any)._id) {
+        await dispatch(
+          updateProduct({ id: (productData as any)._id, data: productData })
+        );
+      } else {
+        await dispatch(createProduct(productData));
+      }
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (confirm("Are you sure you want to delete this category?")) {
+      await dispatch(deleteCategory(id));
   }
+  };
 
-  // Category functions
-  function onDeleteCategory(id: string) {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-  }
+  const handleSaveCategory = async (categoryData: Partial<Category>) => {
+    if ((categoryData as any)._id) {
+      await dispatch(
+        updateCategory({ id: (categoryData as any)._id, data: categoryData })
+      );
+    } else {
+      await dispatch(createCategory(categoryData));
+    }
+  };
 
-  function onSaveCategory(category: Category) {
-    setCategories((prev) => {
-      const exists = prev.some((c) => c.id === category.id);
-      return exists
-        ? prev.map((c) => (c.id === category.id ? category : c))
-        : [{ ...category }, ...prev];
-    });
+  if (productsLoading && items.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-balance">Catalog</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            dispatch(fetchProducts());
+            dispatch(fetchCategories());
+          }}
+          disabled={productsLoading || categoriesLoading}
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${productsLoading || categoriesLoading ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </Button>
       </header>
+
+      {productsError && (
+        <Alert variant="destructive">
+          <AlertDescription>{productsError}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="products" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
@@ -130,14 +179,13 @@ export default function ProductsPage() {
         <TabsContent value="products" className="space-y-4">
           <Card className="bg-card text-card-foreground">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Products</CardTitle>
+              <CardTitle>Products ({items.length})</CardTitle>
               <div className="flex gap-2">
-                <BulkStockDialog products={items} onUpdate={onSave} />
                 <Button variant="outline" size="sm">
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
-                <ProductDialog onSave={onSave} />
+                <ProductDialog onSave={handleSave} categories={categories} />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -165,28 +213,10 @@ export default function ProductsPage() {
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
                       {categories.map((c) => (
-                        <SelectItem key={c.id} value={c.name}>
+                        <SelectItem key={c._id} value={c.name}>
                           {c.name}
                         </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={type}
-                    onValueChange={(v) => {
-                      setType(v);
-                      setPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-48 bg-background">
-                      <SelectValue placeholder="Product Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="purchase">
-                        Purchase (Inventory)
-                      </SelectItem>
-                      <SelectItem value="sale">Sale</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -217,49 +247,46 @@ export default function ProductsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paged.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell>{p.sku}</TableCell>
-                        <TableCell className="font-medium">{p.name}</TableCell>
+                    {paged.map((p) => {
+                      const categoryName =
+                        typeof p.category === "object" 
+                          ? (p.category?.name || "N/A")
+                          : (p.category || "N/A");
+                      const availableStock = (p.stockQuantity || 0) - (p.reservedStock || 0);
+                      return (
+                        <TableRow key={p._id}>
+                          <TableCell>{p.productCode || "N/A"}</TableCell>
+                          <TableCell className="font-medium">{p.productName || "N/A"}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{p.category}</Badge>
+                            <Badge variant="secondary">{categoryName}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              p.type === "purchase" ? "default" : "outline"
-                            }
-                            className={
-                              p.type === "purchase"
-                                ? "bg-blue-600 text-white"
-                                : ""
-                            }
-                          >
-                            {p.type === "purchase" ? "Purchase" : "Sale"}
+                            <Badge variant={p.status === "active" ? "default" : "outline"}>
+                              {p.status || "inactive"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <span
                             className={
-                              p.stock <= (p.reorderPoint || 0)
+                                availableStock <= 10
                                 ? "text-red-600 font-bold"
                                 : ""
                             }
                           >
-                            {p.stock}
+                              {availableStock}
                           </span>
                         </TableCell>
+                          <TableCell className="text-right">-</TableCell>
                         <TableCell className="text-right">
-                          {p.reorderPoint || 0}
+                            ${(p.price || 0).toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right">
-                          ${p.regularPrice.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ${p.premiumPrice.toFixed(2)}
-                        </TableCell>
+                          <TableCell className="text-right">-</TableCell>
                         <TableCell className="flex gap-2">
-                          <ProductDialog existing={p} onSave={onSave}>
+                            <ProductDialog
+                              existing={p}
+                              onSave={handleSave}
+                              categories={categories}
+                            >
                             <Button
                               size="icon"
                               variant="outline"
@@ -272,13 +299,15 @@ export default function ProductsPage() {
                             size="icon"
                             variant="destructive"
                             className="h-8 w-8 bg-transparent hover:bg-transparent"
-                            onClick={() => onDelete(p.id)}
+                              onClick={() => handleDelete(p._id)}
+                              disabled={productsLoading}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                     {paged.length === 0 && (
                       <TableRow>
                         <TableCell
@@ -332,8 +361,8 @@ export default function ProductsPage() {
         <TabsContent value="categories" className="space-y-4">
           <Card className="bg-card text-card-foreground">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Categories</CardTitle>
-              <CategoryDialog onSave={onSaveCategory} />
+              <CardTitle>Categories ({categories.length})</CardTitle>
+              <CategoryDialog onSave={handleSaveCategory} />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-md border border-border overflow-auto">
@@ -342,16 +371,21 @@ export default function ProductsPage() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Description</TableHead>
+                      <TableHead>Discount</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {categories.map((c) => (
-                      <TableRow key={c.id}>
+                      <TableRow key={c._id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{c.description}</TableCell>
+                        <TableCell>{c.description || "-"}</TableCell>
+                        <TableCell>{c.discount || 0}%</TableCell>
                         <TableCell className="flex gap-2">
-                          <CategoryDialog existing={c} onSave={onSaveCategory}>
+                          <CategoryDialog
+                            existing={c}
+                            onSave={handleSaveCategory}
+                          >
                             <Button
                               size="icon"
                               variant="outline"
@@ -364,7 +398,8 @@ export default function ProductsPage() {
                             size="icon"
                             variant="destructive"
                             className="h-8 w-8 bg-transparent hover:bg-transparent"
-                            onClick={() => onDeleteCategory(c.id)}
+                            onClick={() => handleDeleteCategory(c._id)}
+                            disabled={categoriesLoading}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -395,31 +430,67 @@ export default function ProductsPage() {
 function ProductDialog({
   existing,
   onSave,
+  categories,
   children,
 }: {
   existing?: Product;
-  onSave: (p: Product) => void;
+  onSave: (p: Partial<Product> | FormData) => void;
+  categories: Category[];
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Product>(
-    existing ?? {
-      id: crypto.randomUUID(),
-      sku: "",
-      name: "",
-      category: productCategories[0],
-      stock: 0,
-      regularPrice: 0,
-      premiumPrice: 0,
-      type: "sale",
-    }
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [form, setForm] = useState<Partial<Product>>(
+    existing
+      ? {
+          productName: existing.productName || "",
+          productCode: existing.productCode || "",
+          category:
+            typeof existing.category === "object"
+              ? existing.category?._id || ""
+              : existing.category || "",
+          price: existing.price || 0,
+          description: existing.description || "",
+          stockQuantity: existing.stockQuantity || 0,
+          status: existing.status || "active",
+        }
+      : {
+          productName: "",
+          productCode: "",
+          category: categories[0]?._id || "",
+          price: 0,
+          description: "",
+          stockQuantity: 0,
+          status: "active",
+        }
   );
 
-  function submit() {
-    if (!form.name || !form.sku) return;
-    onSave(form);
+  const handleSubmit = async () => {
+    if (!form.productName || !form.productCode || !form.category) return;
+
+    if (imageFile || (existing && imageFile === null)) {
+      // Use FormData for file upload
+      const formData = new FormData();
+      formData.append("productName", form.productName);
+      formData.append("productCode", form.productCode);
+      formData.append("category", form.category as string);
+      formData.append("price", form.price?.toString() || "0");
+      formData.append("description", form.description || "");
+      formData.append("stockQuantity", form.stockQuantity?.toString() || "0");
+      formData.append("status", form.status || "active");
+      if (imageFile) {
+        formData.append("image", imageFile);
+      }
+
+      await onSave(formData);
+    } else {
+      // Use JSON for update without image
+      await onSave(form);
+    }
+
     setOpen(false);
-  }
+    setImageFile(null);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -437,111 +508,128 @@ function ProductDialog({
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="sku">SKU</Label>
+            <Label htmlFor="productCode">Product Code (SKU)</Label>
             <Input
-              id="sku"
-              value={form.sku}
-              onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+              id="productCode"
+              value={form.productCode || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, productCode: e.target.value }))
+              }
               className="bg-background"
+              required
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="productName">Product Name</Label>
             <Input
-              id="name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              id="productName"
+              value={form.productName || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, productName: e.target.value }))
+              }
               className="bg-background"
+              required
             />
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
             <div className="grid gap-2">
               <Label>Category</Label>
               <Select
-                value={form.category}
+              value={form.category as string}
                 onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
               >
                 <SelectTrigger className="bg-background">
-                  <SelectValue />
+                <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {productCategories.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
+                {categories.map((c) => (
+                  <SelectItem key={c._id} value={c._id}>
+                    {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+          <div className="grid gap-2 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label>Product Type</Label>
-              <Select
-                value={form.type}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, type: v as Product["type"] }))
-                }
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="purchase">Purchase (Inventory)</SelectItem>
-                  <SelectItem value="sale">Sale</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="grid gap-2">
-              <Label htmlFor="stock">Stock</Label>
+              <Label htmlFor="price">Price</Label>
               <Input
-                id="stock"
-                type="number"
-                value={form.stock}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, stock: Number(e.target.value) }))
-                }
-                className="bg-background"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="reorderPoint">Reorder Point</Label>
-              <Input
-                id="reorderPoint"
-                type="number"
-                value={form.reorderPoint || 0}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    reorderPoint: Number(e.target.value),
-                  }))
-                }
-                className="bg-background"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="regularPrice">Price</Label>
-              <Input
-                id="regularPrice"
+                id="price"
                 type="number"
                 step="0.01"
-                value={form.regularPrice}
+                value={form.price || 0}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, price: Number(e.target.value) || 0 }))
+                }
+                className="bg-background"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="stockQuantity">Stock Quantity</Label>
+              <Input
+                id="stockQuantity"
+                type="number"
+                value={form.stockQuantity || 0}
                 onChange={(e) =>
                   setForm((f) => ({
                     ...f,
-                    regularPrice: Number(e.target.value),
+                    stockQuantity: Number(e.target.value) || 0,
                   }))
+                }
+                className="bg-background"
+                required
+              />
+            </div>
+            </div>
+            <div className="grid gap-2">
+            <Label htmlFor="description">Description</Label>
+              <Input
+              id="description"
+              value={form.description || ""}
+                onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
                 }
                 className="bg-background"
               />
             </div>
+          <div className="grid gap-2">
+            <Label htmlFor="image">Product Image</Label>
+            <Input
+              id="image"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              className="bg-background"
+            />
+            {existing?.imageUrl && !imageFile && (
+              <p className="text-xs text-muted-foreground">
+                Current: {existing.imageUrl}
+              </p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label>Status</Label>
+            <Select
+              value={form.status}
+              onValueChange={(v: "active" | "inactive") =>
+                setForm((f) => ({ ...f, status: v }))
+              }
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={submit}
+              onClick={handleSubmit}
               className="bg-gradient-to-r from-blue-600 to-purple-600"
             >
               {existing ? "Save Changes" : "Create"}
@@ -701,23 +789,29 @@ function CategoryDialog({
   children,
 }: {
   existing?: Category;
-  onSave: (c: Category) => void;
+  onSave: (c: Partial<Category>) => void;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Category>(
-    existing ?? {
-      id: crypto.randomUUID(),
+  const [form, setForm] = useState<Partial<Category>>(
+    existing
+      ? {
+          name: existing.name,
+          description: existing.description || "",
+          discount: existing.discount || 0,
+        }
+      : {
       name: "",
       description: "",
+          discount: 0,
     }
   );
 
-  function submit() {
+  const handleSubmit = async () => {
     if (!form.name) return;
-    onSave(form);
+    await onSave(form);
     setOpen(false);
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -742,6 +836,7 @@ function CategoryDialog({
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="bg-background"
+              required
             />
           </div>
           <div className="grid gap-2">
@@ -754,12 +849,25 @@ function CategoryDialog({
               className="bg-background"
             />
           </div>
+          <div className="grid gap-2">
+            <Label>Discount (%)</Label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={form.discount}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, discount: Number(e.target.value) }))
+              }
+              className="bg-background"
+            />
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={submit}
+              onClick={handleSubmit}
               className="bg-gradient-to-r from-blue-600 to-purple-600"
             >
               {existing ? "Save Changes" : "Create"}

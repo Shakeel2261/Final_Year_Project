@@ -2,17 +2,18 @@
 
 import type React from "react";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import {
+  fetchCustomers,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  type Customer,
+} from "@/lib/store/slices/customersSlice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -28,41 +29,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { initialCustomers, type Customer } from "@/lib/mock-data";
-
-// Updated Customer type with password
-export type CustomerWithPassword = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  password: string;
-};
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Pencil, Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 export default function CustomersPage() {
-  // Convert initial customers to include password field
-  const initialCustomersWithPassword: CustomerWithPassword[] =
-    initialCustomers.map((customer) => ({
-      ...customer,
-      password: "password123", // Default password, can be changed
-    }));
-
-  const [items, setItems] = useState<CustomerWithPassword[]>(
-    initialCustomersWithPassword
-  );
+  const dispatch = useAppDispatch();
+  const { items, loading, error } = useAppSelector((state) => state.customers);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  useEffect(() => {
+    dispatch(fetchCustomers());
+  }, [dispatch]);
 
   const filtered = useMemo(() => {
     return items.filter((i) => {
       const matchQ =
         q.trim().length === 0 ||
-        i.name.toLowerCase().includes(q.toLowerCase()) ||
-        i.email.toLowerCase().includes(q.toLowerCase());
+        (i.name || "").toLowerCase().includes(q.toLowerCase()) ||
+        (i.email || "").toLowerCase().includes(q.toLowerCase());
       return matchQ;
     });
   }, [items, q]);
@@ -73,25 +60,53 @@ export default function CustomersPage() {
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  function onDelete(id: string) {
-    setItems((prev) => prev.filter((p) => p.id !== id));
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this customer?")) {
+      await dispatch(deleteCustomer(id));
   }
+  };
 
-  function onSave(cust: CustomerWithPassword) {
-    setItems((prev) => {
-      const exists = prev.some((p) => p.id === cust.id);
-      return exists
-        ? prev.map((p) => (p.id === cust.id ? cust : p))
-        : [{ ...cust }, ...prev];
-    });
+  const handleSave = async (customerData: Partial<Customer>) => {
+    if ((customerData as any)._id) {
+      await dispatch(
+        updateCustomer({ id: (customerData as any)._id, data: customerData })
+      );
+    } else {
+      await dispatch(createCustomer(customerData));
+    }
+  };
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Customers</h1>
-        <CustomerDialog onSave={onSave} />
+        <h1 className="text-2xl font-semibold">Customers ({items.length})</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => dispatch(fetchCustomers())}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <CustomerDialog onSave={handleSave} />
+        </div>
       </header>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Card className="bg-card text-card-foreground">
         <CardHeader>
@@ -127,12 +142,12 @@ export default function CustomersPage() {
               </TableHeader>
               <TableBody>
                 {paged.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.email}</TableCell>
-                    <TableCell>{c.phone}</TableCell>
+                  <TableRow key={c._id}>
+                    <TableCell className="font-medium">{c.name || "N/A"}</TableCell>
+                    <TableCell>{c.email || "N/A"}</TableCell>
+                    <TableCell>{c.phone || "N/A"}</TableCell>
                     <TableCell className="flex gap-2">
-                      <CustomerDialog existing={c} onSave={onSave}>
+                      <CustomerDialog existing={c} onSave={handleSave}>
                         <Button
                           size="icon"
                           variant="outline"
@@ -145,7 +160,8 @@ export default function CustomersPage() {
                         size="icon"
                         variant="destructive"
                         className="h-8 w-8 bg-transparent hover:bg-transparent"
-                        onClick={() => onDelete(c.id)}
+                        onClick={() => handleDelete(c._id)}
+                        disabled={loading}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
@@ -208,14 +224,19 @@ function CustomerDialog({
   onSave,
   children,
 }: {
-  existing?: CustomerWithPassword;
-  onSave: (c: CustomerWithPassword) => void;
+  existing?: Customer;
+  onSave: (c: Partial<Customer>) => void;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<CustomerWithPassword>(
-    existing ?? {
-      id: crypto.randomUUID(),
+  const [form, setForm] = useState<Partial<Customer>>(
+    existing
+      ? {
+          name: existing.name,
+          email: existing.email,
+          phone: existing.phone,
+        }
+      : {
       name: "",
       email: "",
       phone: "",
@@ -223,11 +244,11 @@ function CustomerDialog({
     }
   );
 
-  function submit() {
-    if (!form.name || !form.email || !form.password) return;
-    onSave(form);
+  const handleSubmit = async () => {
+    if (!form.name || !form.email) return;
+    await onSave(form);
     setOpen(false);
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -275,24 +296,27 @@ function CustomerDialog({
               className="bg-background"
             />
           </div>
+          {!existing && (
           <div className="grid gap-2">
             <Label>Password</Label>
             <Input
               type="password"
-              value={form.password}
+                value={(form as any).password || ""}
               onChange={(e) =>
                 setForm((f) => ({ ...f, password: e.target.value }))
               }
               className="bg-background"
               placeholder="Set login password for customer"
+                required={!existing}
             />
           </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={submit}
+              onClick={handleSubmit}
               className="bg-gradient-to-r from-blue-600 to-purple-600"
             >
               {existing ? "Save Changes" : "Create"}

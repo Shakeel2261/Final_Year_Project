@@ -5,11 +5,12 @@ import authRoutes from "./user.js";
 import customerAuthRoutes from "./customerAuth.js";
 import orderRoutes from "./order.js";
 import customerRoutes from "./customer.js";
-import CategoryRoutes from "./Category.js";
+import CategoryRoutes from "./category.js";
 import transactionRoutes from "./transaction.js";
 import reportsRoutes from "./reports.js";
 import ledgerRoutes from "./ledger.js";
 import invoiceRoutes from "./invoice.js";
+import stripeRoutes from "./stripe.js";
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use("/transactions", transactionRoutes); // ⬅️ mount transactions und
 router.use("/reports", reportsRoutes); // ⬅️ mount reports under /api/reports
 router.use("/ledger", ledgerRoutes); // ⬅️ mount ledger under /api/ledger
 router.use("/invoices", invoiceRoutes); // ⬅️ mount invoices under /api/invoices
+router.use("/stripe", stripeRoutes); // ⬅️ mount Stripe routes under /api/stripe
 
 export default router;

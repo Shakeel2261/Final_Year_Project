@@ -3,6 +3,15 @@
 import type React from "react";
 
 import { useMemo, useState, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import {
+  fetchTransactions,
+  fetchReceivables,
+  createTransaction,
+  payReceivable,
+  deleteTransaction,
+  type Transaction,
+} from "@/lib/store/slices/transactionsSlice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,28 +37,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  initialTransactions,
-  type Transaction,
-  paymentMethods,
-  transactionTypes,
-  calculateCustomerCredits,
-  type CustomerCredit,
-} from "@/lib/mock-data";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Loader2, RefreshCw, DollarSign } from "lucide-react";
+
+const paymentMethods = ["Cash", "Credit", "Card", "Online"];
+const transactionTypes: Transaction["type"][] = ["Cash", "Credit"];
 
 export default function TransactionsPage() {
-  const [items, setItems] = useState<Transaction[]>(initialTransactions);
+  const dispatch = useAppDispatch();
+  const { items, receivables, loading, error } = useAppSelector(
+    (state) => state.transactions
+  );
+
   const [q, setQ] = useState("");
   const [method, setMethod] = useState<string>("all");
   const [type, setType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-  // Calculate credit balances
-  const customerCredits = calculateCustomerCredits(items);
+  useEffect(() => {
+    dispatch(fetchTransactions());
+    dispatch(fetchReceivables());
+  }, [dispatch]);
 
   // Handle URL parameters for customer filtering
   useEffect(() => {
@@ -60,16 +71,32 @@ export default function TransactionsPage() {
     }
   }, []);
 
+  // Calculate credit balances from receivables
+  const customerCredits = useMemo(() => {
+    const creditsMap = new Map<string, { name: string; balance: number }>();
+    receivables.forEach((t) => {
+      const customerName =
+        typeof t.customer === "object" ? t.customer.name : t.customer || "Unknown";
+      const existing = creditsMap.get(customerName) || { name: customerName, balance: 0 };
+      creditsMap.set(customerName, {
+        ...existing,
+        balance: existing.balance + (t.amount || 0),
+      });
+    });
+    return Array.from(creditsMap.values());
+  }, [receivables]);
+
   const filtered = useMemo(() => {
     return items.filter((i) => {
+      const customerName =
+        typeof i.customer === "object" ? i.customer.name : i.customer || "";
       const matchQ =
         q.trim().length === 0 ||
-        i.customer.toLowerCase().includes(q.toLowerCase());
-      const matchMethod = method === "all" || i.method === method;
+        customerName.toLowerCase().includes(q.toLowerCase());
       const matchType = type === "all" || i.type === type;
-      return matchQ && matchMethod && matchType;
+      return matchQ && matchType;
     });
-  }, [items, q, method, type]);
+  }, [items, q, type]);
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -77,32 +104,63 @@ export default function TransactionsPage() {
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  function onDelete(id: string) {
-    setItems((prev) => prev.filter((p) => p.id !== id));
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this transaction?")) {
+      await dispatch(deleteTransaction(id));
   }
+  };
 
-  function onSave(t: Transaction) {
-    setItems((prev) => {
-      const exists = prev.some((p) => p.id === t.id);
-      return exists
-        ? prev.map((p) => (p.id === t.id ? t : p))
-        : [{ ...t }, ...prev];
-    });
+  const handleSave = async (transactionData: Partial<Transaction>) => {
+    await dispatch(createTransaction(transactionData));
+  };
+
+  const handlePayReceivable = async (id: string) => {
+    if (confirm("Mark this receivable as paid?")) {
+      await dispatch(payReceivable(id));
+    }
+  };
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Transactions</h1>
+          <h1 className="text-2xl font-semibold">Transactions ({items.length})</h1>
           {q && (
             <p className="text-sm text-muted-foreground mt-1">
               Showing transactions for: <span className="font-medium">{q}</span>
             </p>
           )}
         </div>
-        <TransactionDialog onSave={onSave} />
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              dispatch(fetchTransactions());
+              dispatch(fetchReceivables());
+            }}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <TransactionDialog onSave={handleSave} />
+        </div>
       </header>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Card className="bg-card text-card-foreground">
         <CardHeader>
@@ -175,37 +233,41 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paged.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{t.date}</TableCell>
-                    <TableCell className="font-medium">{t.customer}</TableCell>
+                {paged.map((t) => {
+                  const customerName =
+                    typeof t.customer === "object" ? t.customer.name : t.customer || "N/A";
+                  const isCredit = t.type === "Credit";
+                  return (
+                    <TableRow key={t._id}>
+                      <TableCell>
+                        {t.createdAt
+                          ? new Date(t.createdAt).toLocaleDateString()
+                          : "N/A"}
+                      </TableCell>
+                      <TableCell className="font-medium">{customerName}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={t.type === "sale" ? "destructive" : "default"}
-                        className={
-                          t.type === "sale" ? "bg-red-600" : "bg-green-600"
-                        }
+                          variant={isCredit ? "destructive" : "default"}
+                          className={isCredit ? "bg-red-600" : "bg-green-600"}
                       >
-                        {t.type === "sale" ? "Credit Sale" : "Payment"}
+                          {isCredit ? "Credit" : "Cash"}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{t.method}</Badge>
+                        <Badge variant="secondary">{t.type || "N/A"}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <span
-                        className={
-                          t.type === "sale" ? "text-red-600" : "text-green-600"
-                        }
+                          className={isCredit ? "text-red-600" : "text-green-600"}
                       >
-                        {t.type === "sale" ? "+" : "-"}${t.amount.toFixed(2)}
+                          {isCredit ? "+" : "-"}${(t.amount || 0).toFixed(2)}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {t.description || "-"}
+                        {t.notes || "-"}
                     </TableCell>
                     <TableCell className="flex gap-2">
-                      <TransactionDialog existing={t} onSave={onSave}>
+                        <TransactionDialog existing={t} onSave={handleSave}>
                         <Button
                           size="icon"
                           variant="outline"
@@ -218,13 +280,15 @@ export default function TransactionsPage() {
                         size="icon"
                         variant="destructive"
                         className="h-8 w-8 bg-transparent hover:bg-transparent"
-                        onClick={() => onDelete(t.id)}
+                          onClick={() => handleDelete(t._id)}
+                          disabled={loading}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
                 {paged.length === 0 && (
                   <TableRow>
                     <TableCell
@@ -273,6 +337,90 @@ export default function TransactionsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Receivables Section */}
+      {receivables.length > 0 && (
+        <Card className="bg-card text-card-foreground border-orange-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Receivables ({receivables.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {receivables.slice(0, 10).map((t) => {
+                const customerName =
+                  typeof t.customer === "object" ? t.customer.name : t.customer || "N/A";
+                return (
+                  <div
+                    key={t._id}
+                    className="flex justify-between items-center p-3 border border-orange-200 rounded-lg bg-orange-50"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{customerName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t.createdAt
+                          ? new Date(t.createdAt).toLocaleDateString()
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div className="text-right flex items-center gap-3">
+                      <div>
+                        <p className="font-semibold text-red-600">
+                          ${(t.amount || 0).toFixed(2)}
+                        </p>
+                        <Badge variant="destructive" className="text-xs">
+                          {t.status}
+                        </Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handlePayReceivable(t._id)}
+                        disabled={loading}
+                      >
+                        Mark Paid
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {receivables.length > 10 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  And {receivables.length - 10} more receivables...
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Customer Credits Summary */}
+      {customerCredits.length > 0 && (
+        <Card className="bg-card text-card-foreground">
+          <CardHeader>
+            <CardTitle>Customer Credit Balances</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {customerCredits.map((credit, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-center p-2 border rounded"
+                >
+                  <div>
+                    <p className="font-medium text-sm">{credit.name}</p>
+                  </div>
+                  <Badge variant="destructive" className="text-xs">
+                    ${credit.balance.toFixed(2)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -283,27 +431,36 @@ function TransactionDialog({
   children,
 }: {
   existing?: Transaction;
-  onSave: (t: Transaction) => void;
+  onSave: (t: Partial<Transaction>) => void;
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Transaction>(
-    existing ?? {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().slice(0, 10),
+  const [form, setForm] = useState<Partial<Transaction>>(
+    existing
+      ? {
+          customer:
+            typeof existing.customer === "object"
+              ? existing.customer._id
+              : existing.customer,
+          amount: existing.amount,
+          type: existing.type,
+          status: existing.status,
+          notes: existing.notes,
+        }
+      : {
       customer: "",
-      method: paymentMethods[0],
       amount: 0,
-      type: "sale",
-      description: "",
+          type: "Cash",
+          status: "Pending",
+          notes: "",
     }
   );
 
-  function submit() {
-    if (!form.customer) return;
-    onSave(form);
+  const handleSubmit = async () => {
+    if (!form.customer || !form.amount) return;
+    await onSave(form);
     setOpen(false);
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -322,53 +479,19 @@ function TransactionDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-4">
-          <div className="grid gap-2 md:grid-cols-3">
             <div className="grid gap-2">
-              <Label>Date</Label>
+            <Label>Customer ID</Label>
               <Input
-                type="date"
-                value={form.date}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, date: e.target.value }))
-                }
-                className="bg-background"
-              />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label>Customer</Label>
-              <Input
-                value={form.customer}
+              value={form.customer as string || ""}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, customer: e.target.value }))
                 }
                 className="bg-background"
+              placeholder="Customer ID"
+              required
               />
-            </div>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Method</Label>
-              <Select
-                value={form.method}
-                onValueChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    method: v as Transaction["method"],
-                  }))
-                }
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethods.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="grid gap-2">
               <Label>Transaction Type</Label>
               <Select
@@ -384,8 +507,28 @@ function TransactionDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sale">Sale (Credit)</SelectItem>
-                  <SelectItem value="payment">Payment</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Credit">Credit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    status: v as Transaction["status"],
+                  }))
+                }
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Paid">Paid</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -394,22 +537,24 @@ function TransactionDialog({
             <Label>Amount</Label>
             <Input
               type="number"
-              value={form.amount}
+              step="0.01"
+              value={form.amount || 0}
               onChange={(e) =>
-                setForm((f) => ({ ...f, amount: Number(e.target.value) }))
+                setForm((f) => ({ ...f, amount: Number(e.target.value) || 0 }))
               }
               className="bg-background"
+              required
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="notes">Notes</Label>
             <Input
-              id="description"
-              value={form.description || ""}
+              id="notes"
+              value={form.notes || ""}
               onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
+                setForm((f) => ({ ...f, notes: e.target.value }))
               }
-              placeholder="Optional description..."
+              placeholder="Optional notes..."
               className="bg-background"
             />
           </div>
@@ -418,7 +563,7 @@ function TransactionDialog({
               Cancel
             </Button>
             <Button
-              onClick={submit}
+              onClick={handleSubmit}
               className="bg-gradient-to-r from-blue-600 to-purple-600"
             >
               {existing ? "Save Changes" : "Create"}

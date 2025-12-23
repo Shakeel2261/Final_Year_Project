@@ -6,12 +6,6 @@
 # Dependencies
 node_modules/
 
-# Next.js
-.next/
-out/
-build/
-dist/
-
 # Logs
 *.log
 npm-debug.log*
@@ -25,3 +19,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Uploads (optional - uncomment if you don't want to track uploads)
+# uploads/
+
+

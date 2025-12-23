@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import {
+  fetchInvoices,
+  fetchInvoiceSummary,
+  type Invoice,
+} from "@/lib/store/slices/invoicesSlice";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +34,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Pencil,
@@ -40,26 +47,33 @@ import {
   DollarSign,
   Check,
   AlertTriangle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
-import {
-  initialInvoices,
-  type Invoice,
-  invoiceStatuses,
-} from "@/lib/mock-data";
+
+const invoiceStatuses: Invoice["status"][] = ["Paid", "Partial", "Outstanding"];
 
 export default function InvoicesPage() {
-  const [items, setItems] = useState<Invoice[]>(initialInvoices);
+  const dispatch = useAppDispatch();
+  const { items, summary, loading, error, count, total } = useAppSelector(
+    (state) => state.invoices
+  );
+
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
+  useEffect(() => {
+    dispatch(fetchInvoices());
+    dispatch(fetchInvoiceSummary());
+  }, [dispatch]);
+
   const filtered = useMemo(() => {
     return items.filter((i) => {
       const matchQ =
         q.trim().length === 0 ||
-        i.invoiceNumber.toLowerCase().includes(q.toLowerCase()) ||
-        i.customer.toLowerCase().includes(q.toLowerCase());
+        (i.invoiceNumber || "").toLowerCase().includes(q.toLowerCase());
       const matchS = status === "all" || i.status === status;
       return matchQ && matchS;
     });
@@ -71,50 +85,60 @@ export default function InvoicesPage() {
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-  function onDelete(id: string) {
-    setItems((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  function onSave(invoice: Invoice) {
-    setItems((prev) => {
-      const exists = prev.some((p) => p.id === invoice.id);
-      return exists
-        ? prev.map((p) => (p.id === invoice.id ? invoice : p))
-        : [{ ...invoice }, ...prev];
-    });
+  if (loading && items.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
   }
 
   const getStatusColor = (status: Invoice["status"]) => {
     switch (status) {
-      case "draft":
-        return "bg-gray-100 text-gray-700";
-      case "sent":
-        return "bg-blue-100 text-blue-700";
-      case "paid":
+      case "Paid":
         return "bg-green-100 text-green-700";
-      case "overdue":
+      case "Partial":
+        return "bg-yellow-100 text-yellow-700";
+      case "Outstanding":
         return "bg-red-100 text-red-700";
-      case "cancelled":
-        return "bg-orange-100 text-orange-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
   };
 
-  const totalAmount = items.reduce((sum, invoice) => sum + invoice.total, 0);
+  const totalAmount = items.reduce((sum, invoice) => sum + (invoice.originalAmount || 0), 0);
   const paidAmount = items
-    .filter((invoice) => invoice.status === "paid")
-    .reduce((sum, invoice) => sum + invoice.total, 0);
-  const overdueAmount = items
-    .filter((invoice) => invoice.status === "overdue")
-    .reduce((sum, invoice) => sum + invoice.total, 0);
+    .filter((invoice) => invoice.status === "Paid")
+    .reduce((sum, invoice) => sum + (invoice.paidAmount || 0), 0);
+  const outstandingAmount = items
+    .filter((invoice) => invoice.status === "Outstanding")
+    .reduce((sum, invoice) => sum + (invoice.remainingAmount || 0), 0);
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Invoices</h1>
-        <InvoiceDialog onSave={onSave} />
+        <h1 className="text-2xl font-semibold">Invoices ({count || items.length})</h1>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              dispatch(fetchInvoices());
+              dispatch(fetchInvoiceSummary());
+            }}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </header>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -159,13 +183,13 @@ export default function InvoicesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Overdue Amount
+              Outstanding Amount
             </CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              ${overdueAmount.toFixed(2)}
+              ${outstandingAmount.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
@@ -228,20 +252,31 @@ export default function InvoicesPage() {
               </TableHeader>
               <TableBody>
                 {paged.map((invoice) => (
-                  <TableRow key={invoice.id}>
+                  <TableRow key={invoice._id}>
                     <TableCell className="font-medium">
-                      {invoice.invoiceNumber}
+                      {invoice.invoiceNumber || invoice._id.slice(-8)}
                     </TableCell>
-                    <TableCell>{invoice.customer}</TableCell>
-                    <TableCell>{invoice.date}</TableCell>
-                    <TableCell>{invoice.dueDate}</TableCell>
+                    <TableCell>
+                      {typeof invoice.customerId === "object"
+                        ? invoice.customerId.name
+                        : invoice.customerId || "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {invoice.createdAt
+                        ? new Date(invoice.createdAt).toLocaleDateString()
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {invoice.dueDate
+                        ? new Date(invoice.dueDate).toLocaleDateString()
+                        : "N/A"}
+                    </TableCell>
                     <TableCell className="text-right">
-                      ${invoice.total.toFixed(2)}
+                      ${(invoice.originalAmount || 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(invoice.status)}>
-                        {invoice.status.charAt(0).toUpperCase() +
-                          invoice.status.slice(1)}
+                        {invoice.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="flex gap-2">
@@ -250,6 +285,12 @@ export default function InvoicesPage() {
                         variant="outline"
                         className="h-8 w-8 p-0"
                         title="View Invoice"
+                        onClick={() => {
+                          window.open(
+                            `/api/invoices/${invoice._id}/download`,
+                            "_blank"
+                          );
+                        }}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -258,6 +299,12 @@ export default function InvoicesPage() {
                         variant="outline"
                         className="h-8 w-8 p-0"
                         title="Download PDF"
+                        onClick={() => {
+                          window.open(
+                            `/api/invoices/${invoice._id}/download`,
+                            "_blank"
+                          );
+                        }}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -269,26 +316,19 @@ export default function InvoicesPage() {
                       >
                         <Send className="h-4 w-4" />
                       </Button>
-                      <InvoiceDialog existing={invoice} onSave={onSave}>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8 bg-transparent"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </InvoiceDialog>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="h-8 w-8 bg-transparent hover:bg-transparent"
-                        onClick={() => onDelete(invoice.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
+                {paged.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground"
+                    >
+                      No invoices found
+                    </TableCell>
+                  </TableRow>
+                )}
                 {paged.length === 0 && (
                   <TableRow>
                     <TableCell
