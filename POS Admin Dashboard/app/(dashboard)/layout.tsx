@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client";
 
 import { useEffect } from "react";
@@ -30,6 +31,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
+=======
+import { Sidebar } from "@/components/sidebar"
+import { Topbar } from "@/components/topbar"
+import type { ReactNode } from "react"
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <div className="flex">
@@ -40,5 +48,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
     </div>
+<<<<<<< HEAD
   );
+=======
+  )
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 }

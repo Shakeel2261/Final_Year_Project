@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
@@ -8,6 +9,8 @@ import {
   fetchPurchaseReport,
 } from "@/lib/store/slices/reportsSlice";
 import { fetchProducts } from "@/lib/store/slices/productsSlice";
+=======
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,13 +25,27 @@ import {
   CartesianGrid,
 } from "recharts";
 import {
+<<<<<<< HEAD
+=======
+  salesSeries,
+  purchaseSeries,
+  kpis,
+  initialStockAlerts,
+  getLowStockProducts,
+  initialProducts,
+} from "@/lib/mock-data";
+import {
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   ShoppingCart,
   Package,
   Users,
   CreditCard,
   AlertTriangle,
   Bell,
+<<<<<<< HEAD
   Loader2,
+=======
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 } from "lucide-react";
 
 const kpiIcons = {
@@ -39,6 +56,7 @@ const kpiIcons = {
 };
 
 export default function DashboardHome() {
+<<<<<<< HEAD
   const dispatch = useAppDispatch();
   const { dashboardSummary, salesReport, purchaseReport, loading: reportsLoading } = useAppSelector(
     (state) => state.reports
@@ -109,23 +127,41 @@ export default function DashboardHome() {
       </div>
     );
   }
+=======
+  const lowStockProducts = getLowStockProducts(initialProducts, 10);
+  const activeAlerts = initialStockAlerts.filter(
+    (alert) => alert.status === "active"
+  );
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-balance">Overview</h1>
+<<<<<<< HEAD
         {lowStockProducts.length > 0 && (
           <Badge variant="destructive" className="flex items-center gap-1">
             <Bell className="h-3 w-3" />
             {lowStockProducts.length} Stock Alert
             {lowStockProducts.length > 1 ? "s" : ""}
+=======
+        {activeAlerts.length > 0 && (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <Bell className="h-3 w-3" />
+            {activeAlerts.length} Stock Alert
+            {activeAlerts.length > 1 ? "s" : ""}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
           </Badge>
         )}
       </div>
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+<<<<<<< HEAD
         {kpis.length > 0 ? (
           kpis.map((kpi) => {
+=======
+        {kpis.map((kpi) => {
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
           const Icon = kpiIcons[kpi.key as keyof typeof kpiIcons];
           return (
             <Card key={kpi.key} className="bg-card text-card-foreground">
@@ -141,12 +177,16 @@ export default function DashboardHome() {
               </CardContent>
             </Card>
           );
+<<<<<<< HEAD
           })
         ) : (
           <div className="col-span-4 text-center text-muted-foreground py-8">
             Loading dashboard data...
           </div>
         )}
+=======
+        })}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
@@ -155,9 +195,14 @@ export default function DashboardHome() {
             <CardTitle className="text-pretty">Sales (Last 12 Weeks)</CardTitle>
           </CardHeader>
           <CardContent className="h-64">
+<<<<<<< HEAD
             {salesChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={salesChartData}>
+=======
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={salesSeries}>
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                 <CartesianGrid
                   strokeDasharray="3 3"
                   stroke="var(--color-border)"
@@ -182,11 +227,14 @@ export default function DashboardHome() {
                 />
               </LineChart>
             </ResponsiveContainer>
+<<<<<<< HEAD
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 No sales data available
               </div>
             )}
+=======
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
           </CardContent>
         </Card>
 
@@ -197,9 +245,14 @@ export default function DashboardHome() {
             </CardTitle>
           </CardHeader>
           <CardContent className="h-64">
+<<<<<<< HEAD
             {purchaseChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={purchaseChartData}>
+=======
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={purchaseSeries}>
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                 <CartesianGrid
                   strokeDasharray="3 3"
                   stroke="var(--color-border)"
@@ -219,15 +272,67 @@ export default function DashboardHome() {
                 <Bar dataKey="purchases" fill="var(--color-chart-2)" />
               </BarChart>
             </ResponsiveContainer>
+<<<<<<< HEAD
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 No purchase data available
               </div>
             )}
+=======
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
           </CardContent>
         </Card>
       </section>
 
+<<<<<<< HEAD
+=======
+      {/* Stock Alerts Section */}
+      {activeAlerts.length > 0 && (
+        <section>
+          <Card className="bg-card text-card-foreground border-orange-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <AlertTriangle className="h-5 w-5" />
+                Stock Alerts - Action Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {activeAlerts.slice(0, 5).map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex justify-between items-center p-3 border border-orange-200 rounded-lg bg-orange-50"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{alert.productName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {alert.sku}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="destructive" className="text-xs">
+                        {alert.currentStock === 0
+                          ? "Out of Stock"
+                          : `${alert.currentStock} left`}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Reorder at: {alert.reorderPoint}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {activeAlerts.length > 5 && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    And {activeAlerts.length - 5} more alerts...
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
       {/* Low Stock Summary */}
       {lowStockProducts.length > 0 && (
         <section>
@@ -240,6 +345,7 @@ export default function DashboardHome() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+<<<<<<< HEAD
                 {lowStockProducts.slice(0, 6).map((product) => {
                   const availableStock = (product.stockQuantity || 0) - (product.reservedStock || 0);
                   return (
@@ -297,6 +403,27 @@ export default function DashboardHome() {
                         {order.status || "pending"}
                     </Badge>
                     </div>
+=======
+                {lowStockProducts.slice(0, 6).map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex justify-between items-center p-2 border rounded"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {product.sku}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={
+                        product.stock === 0 ? "destructive" : "secondary"
+                      }
+                      className="text-xs"
+                    >
+                      {product.stock === 0 ? "Out" : product.stock}
+                    </Badge>
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                   </div>
                 ))}
               </div>

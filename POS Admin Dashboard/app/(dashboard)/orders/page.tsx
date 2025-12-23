@@ -2,6 +2,7 @@
 
 import type React from "react";
 
+<<<<<<< HEAD
 import { useMemo, useState, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
@@ -11,6 +12,9 @@ import {
   deleteOrder,
   type Order,
 } from "@/lib/store/slices/ordersSlice";
+=======
+import { useMemo, useState } from "react";
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +41,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+<<<<<<< HEAD
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Pencil, Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -46,11 +51,20 @@ const orderStatuses: Order["status"][] = ["pending", "processing", "completed", 
 export default function OrdersPage() {
   const dispatch = useAppDispatch();
   const { items, loading, error } = useAppSelector((state) => state.orders);
+=======
+import { initialOrders, type Order, orderStatuses } from "@/lib/mock-data";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+
+export default function OrdersPage() {
+  const [items, setItems] = useState<Order[]>(initialOrders);
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
+<<<<<<< HEAD
   useEffect(() => {
     dispatch(fetchOrders());
   }, [dispatch]);
@@ -63,6 +77,14 @@ export default function OrdersPage() {
         q.trim().length === 0 ||
         i._id.toLowerCase().includes(q.toLowerCase()) ||
         customerName.toLowerCase().includes(q.toLowerCase());
+=======
+  const filtered = useMemo(() => {
+    return items.filter((i) => {
+      const matchQ =
+        q.trim().length === 0 ||
+        i.id.toLowerCase().includes(q.toLowerCase()) ||
+        i.customer.toLowerCase().includes(q.toLowerCase());
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
       const matchS = status === "all" || i.status === status;
       return matchQ && matchS;
     });
@@ -74,6 +96,7 @@ export default function OrdersPage() {
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
+<<<<<<< HEAD
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this order?")) {
       await dispatch(deleteOrder(id));
@@ -105,11 +128,25 @@ export default function OrdersPage() {
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
+=======
+  function onDelete(id: string) {
+    setItems((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function onSave(order: Order) {
+    setItems((prev) => {
+      const exists = prev.some((p) => p.id === order.id);
+      return exists
+        ? prev.map((p) => (p.id === order.id ? order : p))
+        : [{ ...order }, ...prev];
+    });
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   }
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
+<<<<<<< HEAD
         <h1 className="text-2xl font-semibold">Orders ({items.length})</h1>
         <div className="flex gap-2">
           <Button
@@ -131,6 +168,12 @@ export default function OrdersPage() {
         </Alert>
       )}
 
+=======
+        <h1 className="text-2xl font-semibold">Orders</h1>
+        <OrderDialog onSave={onSave} />
+      </header>
+
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
       <Card className="bg-card text-card-foreground">
         <CardHeader>
           <CardTitle>List</CardTitle>
@@ -185,6 +228,7 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+<<<<<<< HEAD
                 {paged.map((o) => {
                   const customerName =
                     typeof o.customer === "object" ? o.customer.name : o.customer || "N/A";
@@ -195,14 +239,32 @@ export default function OrdersPage() {
                       <TableCell className="text-right">{(o.items || []).length}</TableCell>
                     <TableCell className="text-right">
                         ${(o.totalAmount || 0).toFixed(2)}
+=======
+                {paged.map((o) => (
+                  <TableRow key={o.id}>
+                    <TableCell className="font-medium">{o.id}</TableCell>
+                    <TableCell>{o.customer}</TableCell>
+                    <TableCell className="text-right">{o.items}</TableCell>
+                    <TableCell className="text-right">
+                      ${o.total.toFixed(2)}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                     </TableCell>
                     <TableCell>
                       <Select
                         value={o.status}
                         onValueChange={(value) => {
+<<<<<<< HEAD
                             handleStatusChange(o._id, value as Order["status"]);
                         }}
                           disabled={loading}
+=======
+                          const updatedOrder = {
+                            ...o,
+                            status: value as Order["status"],
+                          };
+                          onSave(updatedOrder);
+                        }}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                       >
                         <SelectTrigger className="w-[140px]">
                           <SelectValue>
@@ -215,11 +277,17 @@ export default function OrdersPage() {
                                   : "bg-red-100 text-red-700"
                               }`}
                             >
+<<<<<<< HEAD
                                 {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
+=======
+                              {o.status.charAt(0).toUpperCase() +
+                                o.status.slice(1)}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                             </span>
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
+<<<<<<< HEAD
                             {orderStatuses.map((s) => (
                               <SelectItem key={s} value={s}>
                                 <span
@@ -235,12 +303,33 @@ export default function OrdersPage() {
                             </span>
                           </SelectItem>
                             ))}
+=======
+                          <SelectItem value="pending">
+                            <span className="px-2 py-1 rounded-md bg-yellow-100 text-yellow-700 text-xs font-medium">
+                              Pending
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="completed">
+                            <span className="px-2 py-1 rounded-md bg-green-100 text-green-700 text-xs font-medium">
+                              Completed
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="cancelled">
+                            <span className="px-2 py-1 rounded-md bg-red-100 text-red-700 text-xs font-medium">
+                              Cancelled
+                            </span>
+                          </SelectItem>
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                         </SelectContent>
                       </Select>
                     </TableCell>
 
                     <TableCell className="flex gap-2">
+<<<<<<< HEAD
                         <OrderDialog existing={o} onSave={handleSave}>
+=======
+                      <OrderDialog existing={o} onSave={onSave}>
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                         <Button
                           size="icon"
                           variant="outline"
@@ -253,15 +342,23 @@ export default function OrdersPage() {
                         size="icon"
                         variant="destructive"
                         className="h-8 w-8 bg-transparent hover:bg-transparent"
+<<<<<<< HEAD
                           onClick={() => handleDelete(o._id)}
                           disabled={loading}
+=======
+                        onClick={() => onDelete(o.id)}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </TableCell>
                   </TableRow>
+<<<<<<< HEAD
                   );
                 })}
+=======
+                ))}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                 {paged.length === 0 && (
                   <TableRow>
                     <TableCell
@@ -320,6 +417,7 @@ function OrderDialog({
   children,
 }: {
   existing?: Order;
+<<<<<<< HEAD
   onSave: (o: Partial<Order>) => void;
   children?: React.ReactNode;
 }) {
@@ -345,6 +443,27 @@ function OrderDialog({
     await onSave(form);
     setOpen(false);
   };
+=======
+  onSave: (o: Order) => void;
+  children?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<Order>(
+    existing ?? {
+      id: `ORD-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      customer: "",
+      items: 1,
+      total: 0,
+      status: orderStatuses[0],
+    }
+  );
+
+  function submit() {
+    if (!form.customer) return;
+    onSave(form);
+    setOpen(false);
+  }
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -362,13 +481,20 @@ function OrderDialog({
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-2">
+<<<<<<< HEAD
             <Label>Customer ID</Label>
             <Input
               value={form.customer as string}
+=======
+            <Label>Customer</Label>
+            <Input
+              value={form.customer}
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
               onChange={(e) =>
                 setForm((f) => ({ ...f, customer: e.target.value }))
               }
               className="bg-background"
+<<<<<<< HEAD
               placeholder="Customer ID or leave empty"
             />
           </div>
@@ -384,6 +510,31 @@ function OrderDialog({
                 }
                 className="bg-background"
                 required
+=======
+            />
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-2">
+              <Label>Items</Label>
+              <Input
+                type="number"
+                value={form.items}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, items: Number(e.target.value) }))
+                }
+                className="bg-background"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Total</Label>
+              <Input
+                type="number"
+                value={form.total}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, total: Number(e.target.value) }))
+                }
+                className="bg-background"
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
               />
             </div>
             <div className="grid gap-2">
@@ -407,17 +558,24 @@ function OrderDialog({
               </Select>
             </div>
           </div>
+<<<<<<< HEAD
           <div className="text-sm text-muted-foreground">
             Note: For creating orders with items, use the API directly or the counter sales page.
           </div>
+=======
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
+<<<<<<< HEAD
             <Button
               onClick={handleSubmit}
               className="bg-gradient-to-r from-blue-600 to-purple-600"
             >
+=======
+            <Button onClick={submit} className="bg-gradient-to-r from-blue-600 to-purple-600">
+>>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
               {existing ? "Save Changes" : "Create"}
             </Button>
           </div>
