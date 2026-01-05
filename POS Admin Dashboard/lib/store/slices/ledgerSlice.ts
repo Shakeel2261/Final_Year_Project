@@ -19,6 +19,7 @@ export interface LedgerEntry {
 
 interface LedgerState {
   entries: LedgerEntry[];
+  selectedEntry: LedgerEntry | null;
   accountBalance: any;
   trialBalance: any;
   profitLoss: any;
@@ -30,6 +31,7 @@ interface LedgerState {
 
 const initialState: LedgerState = {
   entries: [],
+  selectedEntry: null,
   accountBalance: null,
   trialBalance: null,
   profitLoss: null,
@@ -116,10 +118,75 @@ export const fetchBalanceSheet = createAsyncThunk(
   }
 );
 
+export const fetchLedgerEntryById = createAsyncThunk(
+  "ledger/fetchById",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await apiService.getById<{
+        success: boolean;
+        data: LedgerEntry;
+      }>(API_ENDPOINTS.LEDGER.LIST, id);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to fetch ledger entry");
+    }
+  }
+);
+
+export const createLedgerEntry = createAsyncThunk(
+  "ledger/create",
+  async (data: Partial<LedgerEntry>, { rejectWithValue }) => {
+    try {
+      const response = await apiService.create<{
+        success: boolean;
+        message: string;
+        data: LedgerEntry;
+      }>(API_ENDPOINTS.LEDGER.CREATE, data);
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to create ledger entry");
+    }
+  }
+);
+
+export const updateLedgerEntry = createAsyncThunk(
+  "ledger/update",
+  async (
+    { id, data }: { id: string; data: Partial<LedgerEntry> },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await apiService.update<LedgerEntry>(
+        API_ENDPOINTS.LEDGER.LIST,
+        id,
+        data
+      );
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to update ledger entry");
+    }
+  }
+);
+
+export const deleteLedgerEntry = createAsyncThunk(
+  "ledger/delete",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await apiService.delete(API_ENDPOINTS.LEDGER.LIST, id);
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to delete ledger entry");
+    }
+  }
+);
+
 const ledgerSlice = createSlice({
   name: "ledger",
   initialState,
   reducers: {
+    clearSelectedEntry: (state) => {
+      state.selectedEntry = null;
+    },
     clearError: (state) => {
       state.error = null;
     },
@@ -150,9 +217,70 @@ const ledgerSlice = createSlice({
       })
       .addCase(fetchBalanceSheet.fulfilled, (state, action) => {
         state.balanceSheet = action.payload;
+      })
+      .addCase(fetchLedgerEntryById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchLedgerEntryById.fulfilled, (state, action) => {
+        state.loading = false;
+        state.selectedEntry = action.payload;
+      })
+      .addCase(fetchLedgerEntryById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(createLedgerEntry.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createLedgerEntry.fulfilled, (state, action) => {
+        state.loading = false;
+        state.entries.unshift(action.payload);
+        state.totalRecords = (state.totalRecords || 0) + 1;
+      })
+      .addCase(createLedgerEntry.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(updateLedgerEntry.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateLedgerEntry.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.entries.findIndex(
+          (e) => e._id === action.payload._id
+        );
+        if (index !== -1) {
+          state.entries[index] = action.payload;
+        }
+        if (state.selectedEntry?._id === action.payload._id) {
+          state.selectedEntry = action.payload;
+        }
+      })
+      .addCase(updateLedgerEntry.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(deleteLedgerEntry.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteLedgerEntry.fulfilled, (state, action) => {
+        state.loading = false;
+        state.entries = state.entries.filter((e) => e._id !== action.payload);
+        state.totalRecords = (state.totalRecords || 0) - 1;
+        if (state.selectedEntry?._id === action.payload) {
+          state.selectedEntry = null;
+        }
+      })
+      .addCase(deleteLedgerEntry.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });
 
-export const { clearError } = ledgerSlice.actions;
+export const { clearSelectedEntry, clearError } = ledgerSlice.actions;
 export default ledgerSlice.reducer;

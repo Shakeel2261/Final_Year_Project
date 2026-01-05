@@ -90,6 +90,18 @@ export const payReceivable = createAsyncThunk(
   }
 );
 
+export const deleteTransaction = createAsyncThunk(
+  "transactions/delete",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await apiService.delete(API_ENDPOINTS.TRANSACTIONS.LIST, id);
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to delete transaction");
+    }
+  }
+);
+
 const transactionsSlice = createSlice({
   name: "transactions",
   initialState,
@@ -127,6 +139,12 @@ const transactionsSlice = createSlice({
         }
         state.receivables = state.receivables.filter(
           (t) => t._id !== action.payload._id
+        );
+      })
+      .addCase(deleteTransaction.fulfilled, (state, action) => {
+        state.items = state.items.filter((t) => t._id !== action.payload);
+        state.receivables = state.receivables.filter(
+          (t) => t._id !== action.payload
         );
       });
   },

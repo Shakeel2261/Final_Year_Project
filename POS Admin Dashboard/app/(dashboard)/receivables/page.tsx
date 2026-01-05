@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,24 +37,72 @@ import {
   TrendingUp,
   Users,
   Eye,
+  Loader2,
 } from "lucide-react";
-import {
-  initialTransactions,
-  calculateCustomerCredits,
-  type CustomerCredit,
-  type Transaction,
-  paymentMethods,
-} from "@/lib/mock-data";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchReceivables, payReceivable } from "@/lib/store/slices/transactionsSlice";
+import type { Transaction } from "@/lib/store/slices/transactionsSlice";
+
+interface CustomerCredit {
+  customerId: string;
+  customerName: string;
+  totalCredit: number;
+  totalPaid: number;
+  balance: number;
+  lastTransactionDate: string;
+}
+
+const paymentMethods = ["Cash", "Credit", "Bank Transfer", "Cheque"];
 
 export default function ReceivablesPage() {
-  const [transactions, setTransactions] =
-    useState<Transaction[]>(initialTransactions);
+  const dispatch = useAppDispatch();
+  const { receivables, loading } = useAppSelector((state) => state.transactions);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"balance" | "name" | "date">("balance");
 
-  // Calculate credit balances
+  useEffect(() => {
+    dispatch(fetchReceivables());
+  }, [dispatch]);
+
+  // Calculate credit balances from receivables
   const customerCredits = useMemo(() => {
-    const credits = calculateCustomerCredits(transactions);
+    const creditMap = new Map<string, CustomerCredit>();
+
+    receivables.forEach((transaction) => {
+      const customerId = typeof transaction.customer === "object" 
+        ? transaction.customer._id 
+        : transaction.customer || "";
+      const customerName = typeof transaction.customer === "object"
+        ? transaction.customer.name
+        : "Unknown Customer";
+
+      if (!creditMap.has(customerId)) {
+        creditMap.set(customerId, {
+          customerId,
+          customerName,
+          totalCredit: 0,
+          totalPaid: 0,
+          balance: 0,
+          lastTransactionDate: transaction.createdAt || new Date().toISOString(),
+        });
+      }
+
+      const credit = creditMap.get(customerId)!;
+      if (transaction.type === "Credit") {
+        credit.totalCredit += transaction.amount || 0;
+      } else if (transaction.type === "Cash") {
+        credit.totalPaid += transaction.amount || 0;
+      }
+      credit.balance = credit.totalCredit - credit.totalPaid;
+      
+      const transactionDate = transaction.createdAt || new Date().toISOString();
+      if (new Date(transactionDate) > new Date(credit.lastTransactionDate)) {
+        credit.lastTransactionDate = transactionDate;
+      }
+    });
+
+    const credits = Array.from(creditMap.values()).filter(c => c.balance > 0);
+    
     return credits.sort((a, b) => {
       switch (sortBy) {
         case "balance":
@@ -70,7 +118,7 @@ export default function ReceivablesPage() {
           return 0;
       }
     });
-  }, [transactions, sortBy]);
+  }, [receivables, sortBy]);
 
   const filteredCredits = useMemo(() => {
     return customerCredits.filter(
@@ -86,18 +134,13 @@ export default function ReceivablesPage() {
   );
   const totalCustomers = customerCredits.length;
 
-  const addPayment = (customerName: string, amount: number) => {
-    const newPayment: Transaction = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().slice(0, 10),
-      customer: customerName,
-      method: "Cash",
-      amount: amount,
-      type: "payment",
-      description: `Payment received from ${customerName}`,
-    };
-
-    setTransactions([...transactions, newPayment]);
+  const handlePayment = async (transactionId: string) => {
+    try {
+      await dispatch(payReceivable(transactionId)).unwrap();
+      dispatch(fetchReceivables()); // Refresh receivables
+    } catch (error: any) {
+      alert(`Error recording payment: ${error.message || "Unknown error"}`);
+    }
   };
 
   return (
@@ -210,8 +253,15 @@ export default function ReceivablesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCredits.map((credit) => (
-                  <TableRow key={credit.customerId}>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCredits.map((credit) => (
+                    <TableRow key={credit.customerId}>
                     <TableCell className="font-medium">
                       {credit.customerName}
                     </TableCell>
@@ -238,18 +288,27 @@ export default function ReceivablesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <PaymentDialog
-                          customerName={credit.customerName}
-                          currentBalance={credit.balance}
-                          onPayment={addPayment}
-                        />
+                        {(() => {
+                          const pendingTransaction = receivables.find(t => {
+                            const customerId = typeof t.customer === "object" ? t.customer._id : t.customer;
+                            return customerId === credit.customerId && t.status === "Pending";
+                          });
+                          return pendingTransaction ? (
+                            <PaymentDialog
+                              transactionId={pendingTransaction._id}
+                              customerName={credit.customerName}
+                              currentBalance={credit.balance}
+                              onPayment={handlePayment}
+                            />
+                          ) : null;
+                        })()}
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => {
                             // Navigate to transactions page with customer filter
                             window.location.href = `/transactions?customer=${encodeURIComponent(
-                              credit.customerName
+                              credit.customerId
                             )}`;
                           }}
                         >
@@ -259,8 +318,9 @@ export default function ReceivablesPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-                {filteredCredits.length === 0 && (
+                  ))
+                )}
+                {!loading && filteredCredits.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -282,24 +342,21 @@ export default function ReceivablesPage() {
 }
 
 function PaymentDialog({
+  transactionId,
   customerName,
   currentBalance,
   onPayment,
 }: {
+  transactionId: string;
   customerName: string;
   currentBalance: number;
-  onPayment: (customerName: string, amount: number) => void;
+  onPayment: (transactionId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState<number>(0);
-  const [method, setMethod] = useState<Transaction["method"]>("Cash");
 
   const handlePayment = () => {
-    if (amount > 0 && amount <= currentBalance) {
-      onPayment(customerName, amount);
-      setAmount(0);
-      setOpen(false);
-    }
+    onPayment(transactionId);
+    setOpen(false);
   };
 
   return (
@@ -319,38 +376,9 @@ function PaymentDialog({
             <p className="text-sm text-blue-800">
               <strong>Outstanding Balance:</strong> ${currentBalance.toFixed(2)}
             </p>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="amount">Payment Amount</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              max={currentBalance}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              placeholder={`Max: $${currentBalance.toFixed(2)}`}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label>Payment Method</Label>
-            <Select
-              value={method}
-              onValueChange={(v: Transaction["method"]) => setMethod(v)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {paymentMethods.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <p className="text-xs text-blue-600 mt-1">
+              This will mark the receivable as paid.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2">
@@ -359,10 +387,9 @@ function PaymentDialog({
             </Button>
             <Button
               onClick={handlePayment}
-              disabled={amount <= 0 || amount > currentBalance}
               className="bg-gradient-to-r from-green-600 to-blue-600"
             >
-              Record Payment
+              Mark as Paid
             </Button>
           </div>
         </div>

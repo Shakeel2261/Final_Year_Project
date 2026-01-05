@@ -3,7 +3,6 @@
 import type React from "react";
 
 import { useMemo, useState, useEffect } from "react";
-<<<<<<< HEAD
 import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import {
   fetchTransactions,
@@ -13,8 +12,6 @@ import {
   deleteTransaction,
   type Transaction,
 } from "@/lib/store/slices/transactionsSlice";
-=======
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +37,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-<<<<<<< HEAD
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -55,37 +51,16 @@ export default function TransactionsPage() {
     (state) => state.transactions
   );
 
-=======
-import {
-  initialTransactions,
-  type Transaction,
-  paymentMethods,
-  transactionTypes,
-  calculateCustomerCredits,
-  type CustomerCredit,
-} from "@/lib/mock-data";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-
-export default function TransactionsPage() {
-  const [items, setItems] = useState<Transaction[]>(initialTransactions);
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   const [q, setQ] = useState("");
   const [method, setMethod] = useState<string>("all");
   const [type, setType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-<<<<<<< HEAD
   useEffect(() => {
     dispatch(fetchTransactions());
     dispatch(fetchReceivables());
   }, [dispatch]);
-=======
-  // Calculate credit balances
-  const customerCredits = calculateCustomerCredits(items);
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 
   // Handle URL parameters for customer filtering
   useEffect(() => {
@@ -96,7 +71,6 @@ export default function TransactionsPage() {
     }
   }, []);
 
-<<<<<<< HEAD
   // Calculate credit balances from receivables
   const customerCredits = useMemo(() => {
     const creditsMap = new Map<string, { name: string; balance: number }>();
@@ -123,18 +97,6 @@ export default function TransactionsPage() {
       return matchQ && matchType;
     });
   }, [items, q, type]);
-=======
-  const filtered = useMemo(() => {
-    return items.filter((i) => {
-      const matchQ =
-        q.trim().length === 0 ||
-        i.customer.toLowerCase().includes(q.toLowerCase());
-      const matchMethod = method === "all" || i.method === method;
-      const matchType = type === "all" || i.type === type;
-      return matchQ && matchMethod && matchType;
-    });
-  }, [items, q, method, type]);
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 
   const paged = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -142,7 +104,6 @@ export default function TransactionsPage() {
   }, [filtered, page]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
-<<<<<<< HEAD
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this transaction?")) {
       await dispatch(deleteTransaction(id));
@@ -165,37 +126,19 @@ export default function TransactionsPage() {
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
-=======
-  function onDelete(id: string) {
-    setItems((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  function onSave(t: Transaction) {
-    setItems((prev) => {
-      const exists = prev.some((p) => p.id === t.id);
-      return exists
-        ? prev.map((p) => (p.id === t.id ? t : p))
-        : [{ ...t }, ...prev];
-    });
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   }
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-<<<<<<< HEAD
           <h1 className="text-2xl font-semibold">Transactions ({items.length})</h1>
-=======
-          <h1 className="text-2xl font-semibold">Transactions</h1>
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
           {q && (
             <p className="text-sm text-muted-foreground mt-1">
               Showing transactions for: <span className="font-medium">{q}</span>
             </p>
           )}
         </div>
-<<<<<<< HEAD
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -219,11 +162,6 @@ export default function TransactionsPage() {
         </Alert>
       )}
 
-=======
-        <TransactionDialog onSave={onSave} />
-      </header>
-
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
       <Card className="bg-card text-card-foreground">
         <CardHeader>
           <CardTitle>List</CardTitle>
@@ -295,7 +233,6 @@ export default function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-<<<<<<< HEAD
                 {paged.map((t) => {
                   const customerName =
                     typeof t.customer === "object" ? t.customer.name : t.customer || "N/A";
@@ -331,39 +268,6 @@ export default function TransactionsPage() {
                     </TableCell>
                     <TableCell className="flex gap-2">
                         <TransactionDialog existing={t} onSave={handleSave}>
-=======
-                {paged.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{t.date}</TableCell>
-                    <TableCell className="font-medium">{t.customer}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={t.type === "sale" ? "destructive" : "default"}
-                        className={
-                          t.type === "sale" ? "bg-red-600" : "bg-green-600"
-                        }
-                      >
-                        {t.type === "sale" ? "Credit Sale" : "Payment"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{t.method}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span
-                        className={
-                          t.type === "sale" ? "text-red-600" : "text-green-600"
-                        }
-                      >
-                        {t.type === "sale" ? "+" : "-"}${t.amount.toFixed(2)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {t.description || "-"}
-                    </TableCell>
-                    <TableCell className="flex gap-2">
-                      <TransactionDialog existing={t} onSave={onSave}>
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                         <Button
                           size="icon"
                           variant="outline"
@@ -376,23 +280,15 @@ export default function TransactionsPage() {
                         size="icon"
                         variant="destructive"
                         className="h-8 w-8 bg-transparent hover:bg-transparent"
-<<<<<<< HEAD
                           onClick={() => handleDelete(t._id)}
                           disabled={loading}
-=======
-                        onClick={() => onDelete(t.id)}
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </TableCell>
                   </TableRow>
-<<<<<<< HEAD
                   );
                 })}
-=======
-                ))}
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                 {paged.length === 0 && (
                   <TableRow>
                     <TableCell
@@ -441,7 +337,6 @@ export default function TransactionsPage() {
           </div>
         </CardContent>
       </Card>
-<<<<<<< HEAD
 
       {/* Receivables Section */}
       {receivables.length > 0 && (
@@ -526,8 +421,6 @@ export default function TransactionsPage() {
           </CardContent>
         </Card>
       )}
-=======
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
     </div>
   );
 }
@@ -538,7 +431,6 @@ function TransactionDialog({
   children,
 }: {
   existing?: Transaction;
-<<<<<<< HEAD
   onSave: (t: Partial<Transaction>) => void;
   children?: React.ReactNode;
 }) {
@@ -569,29 +461,6 @@ function TransactionDialog({
     await onSave(form);
     setOpen(false);
   };
-=======
-  onSave: (t: Transaction) => void;
-  children?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Transaction>(
-    existing ?? {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().slice(0, 10),
-      customer: "",
-      method: paymentMethods[0],
-      amount: 0,
-      type: "sale",
-      description: "",
-    }
-  );
-
-  function submit() {
-    if (!form.customer) return;
-    onSave(form);
-    setOpen(false);
-  }
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -610,70 +479,20 @@ function TransactionDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-4">
-<<<<<<< HEAD
             <div className="grid gap-2">
             <Label>Customer ID</Label>
               <Input
               value={form.customer as string || ""}
-=======
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="grid gap-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, date: e.target.value }))
-                }
-                className="bg-background"
-              />
-            </div>
-            <div className="grid gap-2 md:col-span-2">
-              <Label>Customer</Label>
-              <Input
-                value={form.customer}
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                 onChange={(e) =>
                   setForm((f) => ({ ...f, customer: e.target.value }))
                 }
                 className="bg-background"
-<<<<<<< HEAD
               placeholder="Customer ID"
               required
               />
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             <div className="grid gap-2">
-=======
-              />
-            </div>
-          </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Method</Label>
-              <Select
-                value={form.method}
-                onValueChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    method: v as Transaction["method"],
-                  }))
-                }
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethods.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
               <Label>Transaction Type</Label>
               <Select
                 value={form.type}
@@ -688,7 +507,6 @@ function TransactionDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-<<<<<<< HEAD
                   <SelectItem value="Cash">Cash</SelectItem>
                   <SelectItem value="Credit">Credit</SelectItem>
                 </SelectContent>
@@ -711,10 +529,6 @@ function TransactionDialog({
                 <SelectContent>
                   <SelectItem value="Pending">Pending</SelectItem>
                   <SelectItem value="Paid">Paid</SelectItem>
-=======
-                  <SelectItem value="sale">Sale (Credit)</SelectItem>
-                  <SelectItem value="payment">Payment</SelectItem>
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                 </SelectContent>
               </Select>
             </div>
@@ -723,7 +537,6 @@ function TransactionDialog({
             <Label>Amount</Label>
             <Input
               type="number"
-<<<<<<< HEAD
               step="0.01"
               value={form.amount || 0}
               onChange={(e) =>
@@ -742,24 +555,6 @@ function TransactionDialog({
                 setForm((f) => ({ ...f, notes: e.target.value }))
               }
               placeholder="Optional notes..."
-=======
-              value={form.amount}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, amount: Number(e.target.value) }))
-              }
-              className="bg-background"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              value={form.description || ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
-              }
-              placeholder="Optional description..."
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
               className="bg-background"
             />
           </div>
@@ -768,11 +563,7 @@ function TransactionDialog({
               Cancel
             </Button>
             <Button
-<<<<<<< HEAD
               onClick={handleSubmit}
-=======
-              onClick={submit}
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
               className="bg-gradient-to-r from-blue-600 to-purple-600"
             >
               {existing ? "Save Changes" : "Create"}
@@ -783,3 +574,4 @@ function TransactionDialog({
     </Dialog>
   );
 }
+

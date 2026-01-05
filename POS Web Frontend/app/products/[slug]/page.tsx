@@ -1,7 +1,9 @@
+"use client";
+
+import { useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { getProductBySlug } from "@/lib/data";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import Image from "next/image";
 import { formatCurrency } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -15,24 +17,62 @@ import {
   Shield,
   Truck,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchProducts, fetchProductById } from "@/lib/store/slices/productsSlice";
 
 type Props = { params: { slug: string } };
 
 export default function ProductDetailsPage({ params }: Props) {
-  const product = getProductBySlug(params.slug);
-  if (!product) return notFound();
-  const outOfStock = product.stock <= 0;
+  const dispatch = useAppDispatch();
+  const { items: products, selectedProduct, loading } = useAppSelector(
+    (state) => state.products
+  );
+  const router = useRouter();
 
-  // Client-only add to cart via inline client component
+  useEffect(() => {
+    // Try to find product by slug or ID
+    const product = products.find(
+      (p) => p.slug === params.slug || 
+             p._id === params.slug ||
+             (p.productName || "").toLowerCase().replace(/\s+/g, '-') === params.slug
+    );
+    
+    if (product && !selectedProduct) {
+      dispatch(fetchProductById(product._id));
+    } else if (!product && products.length > 0) {
+      // Product not found
+      router.push("/products");
+    }
+  }, [dispatch, params.slug, products, selectedProduct, router]);
+
+  const product = selectedProduct || products.find(
+    (p) => p.slug === params.slug || 
+           p._id === params.slug ||
+           (p.productName || "").toLowerCase().replace(/\s+/g, '-') === params.slug
+  );
+
+  if (loading && !product) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </main>
+    );
+  }
+
+  if (!product) return notFound();
+  
+  const outOfStock = (product.stockQuantity || 0) <= 0;
+
+  // Add to cart component
   function AddToCart() {
-    "use client";
     const { add } = useCart();
     return (
       <Button
         size="lg"
         disabled={outOfStock}
-        onClick={() => add(product.id, 1)}
+        onClick={() => add(product._id, 1)}
         className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 text-lg shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
         <ShoppingCart className="mr-2 h-5 w-5" />
@@ -60,7 +100,7 @@ export default function ProductDetailsPage({ params }: Props) {
               Products
             </a>
             <span>/</span>
-            <span className="text-slate-800 font-medium">{product.name}</span>
+            <span className="text-slate-800 font-medium">{product.productName || "Product"}</span>
           </nav>
         </div>
       </section>
@@ -72,20 +112,20 @@ export default function ProductDetailsPage({ params }: Props) {
             <div className="relative w-full aspect-square bg-gradient-to-br from-slate-50 to-slate-100 rounded-3xl overflow-hidden shadow-2xl">
               <Image
                 src={product.imageUrl || "/placeholder.svg"}
-                alt={product.name}
+                alt={product.productName || "Product"}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-contain p-8"
               />
 
-              {/* Featured/Trending Badge */}
-              {(product.featured || product.trending) && (
+              {/* Status Badge */}
+              {product.status === "active" && (
                 <div className="absolute top-6 left-6">
                   <Badge
-                    variant={product.featured ? "default" : "secondary"}
+                    variant="default"
                     className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 shadow-lg text-sm px-4 py-2"
                   >
-                    {product.featured ? "Featured" : "Trending"}
+                    Available
                   </Badge>
                 </div>
               )}
@@ -116,12 +156,12 @@ export default function ProductDetailsPage({ params }: Props) {
           <div className="space-y-8">
             <div className="space-y-4">
               <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent leading-tight">
-                {product.name}
+                {product.productName || "Product"}
               </h1>
 
               <div className="flex items-center gap-4">
                 <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  {formatCurrency(product.price)}
+                  {formatCurrency(product.price || 0)}
                 </span>
                 <Badge
                   variant={outOfStock ? "destructive" : "secondary"}
@@ -154,7 +194,7 @@ export default function ProductDetailsPage({ params }: Props) {
                 Description
               </h2>
               <p className="text-slate-600 leading-relaxed text-lg">
-                {product.description}
+                {product.description || "No description available."}
               </p>
             </div>
 

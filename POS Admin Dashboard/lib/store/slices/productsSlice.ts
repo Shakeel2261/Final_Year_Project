@@ -65,6 +65,23 @@ export const fetchProductById = createAsyncThunk(
   }
 );
 
+export const fetchProductsByCategory = createAsyncThunk(
+  "products/fetchByCategory",
+  async (category: string, { rejectWithValue }) => {
+    try {
+      const response = await apiService.getAll<{
+        success: boolean;
+        data: Product[];
+      }>(API_ENDPOINTS.PRODUCTS.BY_CATEGORY(category));
+      return response.data || [];
+    } catch (error: any) {
+      return rejectWithValue(
+        error.message || "Failed to fetch products by category"
+      );
+    }
+  }
+);
+
 export const createProduct = createAsyncThunk(
   "products/create",
   async (productData: FormData | Partial<Product>, { rejectWithValue }) => {

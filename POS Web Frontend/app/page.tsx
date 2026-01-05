@@ -1,13 +1,33 @@
+"use client";
+
+import { useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import Link from "next/link";
-import { categories, products } from "@/lib/data";
 import { ProductGrid } from "@/components/product-grid";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Star, Shield, Zap, Heart } from "lucide-react";
+import { ArrowRight, Star, Shield, Zap, Heart, Loader2 } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchProducts } from "@/lib/store/slices/productsSlice";
+import { fetchCategories } from "@/lib/store/slices/categoriesSlice";
 
 export default function HomePage() {
-  const trending = products.filter((p) => p.trending);
+  const dispatch = useAppDispatch();
+  const { items: products, loading: productsLoading } = useAppSelector(
+    (state) => state.products
+  );
+  const { items: categories, loading: categoriesLoading } = useAppSelector(
+    (state) => state.categories
+  );
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+    dispatch(fetchCategories());
+  }, [dispatch]);
+
+  const trending = products
+    .filter((p) => p.status === "active")
+    .slice(0, 8);
   const featuredCategories = categories.slice(0, 5);
 
   return (
@@ -123,19 +143,28 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-4">
-            {featuredCategories.map((c) => (
-              <Link key={c.id} href={`/products?category=${c.slug}`}>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="px-6 py-3 bg-white/80 backdrop-blur-sm border-2 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
-                >
-                  {c.name}
-                </Button>
-              </Link>
-            ))}
-          </div>
+          {categoriesLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="flex flex-wrap justify-center gap-4">
+              {featuredCategories.map((c) => {
+                const categorySlug = c.slug || c._id || c.name.toLowerCase().replace(/\s+/g, '-');
+                return (
+                  <Link key={c._id} href={`/products?category=${categorySlug}`}>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="px-6 py-3 bg-white/80 backdrop-blur-sm border-2 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-blue-300 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                    >
+                      {c.name}
+                    </Button>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -151,7 +180,17 @@ export default function HomePage() {
             </p>
           </div>
 
-          <ProductGrid products={trending} />
+          {productsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : trending.length > 0 ? (
+            <ProductGrid products={trending} />
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No trending products available</p>
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Link href="/products">

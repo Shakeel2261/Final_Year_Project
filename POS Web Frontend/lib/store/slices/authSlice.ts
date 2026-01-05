@@ -47,6 +47,41 @@ export const customerLogin = createAsyncThunk(
   }
 );
 
+export const customerForgotPassword = createAsyncThunk(
+  "auth/customerForgotPassword",
+  async (email: string, { rejectWithValue }) => {
+    try {
+      const response = await apiService.create<{
+        success: boolean;
+        message: string;
+      }>(API_ENDPOINTS.CUSTOMER_AUTH.FORGOT_PASSWORD, { email });
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.message || "Failed to send password reset email"
+      );
+    }
+  }
+);
+
+export const customerResetPassword = createAsyncThunk(
+  "auth/customerResetPassword",
+  async (
+    { token, password }: { token: string; password: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await apiService.create<{
+        success: boolean;
+        message: string;
+      }>(API_ENDPOINTS.CUSTOMER_AUTH.RESET_PASSWORD(token), { password });
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to reset password");
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: "auth",
   initialState,
@@ -78,6 +113,30 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
         state.isAuthenticated = false;
+      })
+      .addCase(customerForgotPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(customerForgotPassword.fulfilled, (state) => {
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(customerForgotPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(customerResetPassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(customerResetPassword.fulfilled, (state) => {
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(customerResetPassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });

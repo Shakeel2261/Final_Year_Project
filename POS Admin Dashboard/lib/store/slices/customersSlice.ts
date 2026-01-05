@@ -39,6 +39,21 @@ export const fetchCustomers = createAsyncThunk(
   }
 );
 
+export const fetchCustomerById = createAsyncThunk(
+  "customers/fetchById",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await apiService.getById<Customer>(
+        API_ENDPOINTS.CUSTOMERS.LIST,
+        id
+      );
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || "Failed to fetch customer");
+    }
+  }
+);
+
 export const createCustomer = createAsyncThunk(
   "customers/create",
   async (data: Partial<Customer>, { rejectWithValue }) => {
@@ -104,6 +119,18 @@ const customersSlice = createSlice({
         state.items = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchCustomers.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(fetchCustomerById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchCustomerById.fulfilled, (state, action) => {
+        state.loading = false;
+        state.selectedCustomer = action.payload;
+      })
+      .addCase(fetchCustomerById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })

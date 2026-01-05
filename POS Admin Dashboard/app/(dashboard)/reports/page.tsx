@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
@@ -12,14 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-=======
-"use client"
-
-import { useMemo, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 import {
   BarChart,
   Bar,
@@ -31,7 +22,6 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   Legend,
-<<<<<<< HEAD
 } from "recharts";
 import { Loader2, RefreshCw } from "lucide-react";
 
@@ -80,28 +70,11 @@ export default function ReportsPage() {
       })) || []
     );
   }, [revenueReport]);
-=======
-} from "recharts"
-import { salesSeries, purchaseSeries } from "@/lib/mock-data"
-
-export default function ReportsPage() {
-  const [from, setFrom] = useState<string>("")
-  const [to, setTo] = useState<string>("")
-  // For demo, just filter by label suffix pretending it's a date bucket
-  const filtered = useMemo(() => {
-    // In real app, filter by actual dates
-    return {
-      sales: salesSeries,
-      purchases: purchaseSeries,
-    }
-  }, [from, to])
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Reports</h1>
-<<<<<<< HEAD
         <Button
           variant="outline"
           size="sm"
@@ -118,13 +91,10 @@ export default function ReportsPage() {
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
-=======
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
-<<<<<<< HEAD
           <label className="text-sm text-muted-foreground">From Date</label>
           <Input
             type="date"
@@ -141,14 +111,6 @@ export default function ReportsPage() {
             onChange={(e) => setTo(e.target.value)}
             className="bg-background"
           />
-=======
-          <label className="text-sm text-muted-foreground">From</label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-background" />
-        </div>
-        <div className="grid gap-2">
-          <label className="text-sm text-muted-foreground">To</label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-background" />
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
         </div>
       </div>
 
@@ -156,15 +118,11 @@ export default function ReportsPage() {
         <TabsList className="bg-secondary text-secondary-foreground">
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="purchases">Purchases</TabsTrigger>
-<<<<<<< HEAD
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
-=======
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
         </TabsList>
         <TabsContent value="sales" className="space-y-4">
           <Card className="bg-card text-card-foreground">
             <CardHeader>
-<<<<<<< HEAD
               <CardTitle>Sales Report (Last 12 Weeks)</CardTitle>
               {salesReport?.data?.summary && (
                 <p className="text-sm text-muted-foreground">
@@ -190,15 +148,6 @@ export default function ReportsPage() {
                       dataKey="label"
                       tick={{ fill: "var(--color-muted-foreground)" }}
                     />
-=======
-              <CardTitle>Sales Report</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={filtered.sales}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="label" tick={{ fill: "var(--color-muted-foreground)" }} />
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                   <YAxis tick={{ fill: "var(--color-muted-foreground)" }} />
                   <Tooltip
                     contentStyle={{
@@ -208,7 +157,6 @@ export default function ReportsPage() {
                     }}
                   />
                   <Legend />
-<<<<<<< HEAD
                     <Line
                       type="monotone"
                       dataKey="sales"
@@ -222,11 +170,6 @@ export default function ReportsPage() {
                   No sales data available
                 </div>
               )}
-=======
-                  <Line type="monotone" dataKey="sales" stroke="var(--color-chart-1)" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
             </CardContent>
           </Card>
         </TabsContent>
@@ -234,7 +177,6 @@ export default function ReportsPage() {
         <TabsContent value="purchases" className="space-y-4">
           <Card className="bg-card text-card-foreground">
             <CardHeader>
-<<<<<<< HEAD
               <CardTitle>Purchase Report (Last 12 Weeks)</CardTitle>
               {purchaseReport?.data?.summary && (
                 <p className="text-sm text-muted-foreground">
@@ -259,15 +201,6 @@ export default function ReportsPage() {
                       dataKey="label"
                       tick={{ fill: "var(--color-muted-foreground)" }}
                     />
-=======
-              <CardTitle>Purchase Report</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={filtered.purchases}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="label" tick={{ fill: "var(--color-muted-foreground)" }} />
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
                   <YAxis tick={{ fill: "var(--color-muted-foreground)" }} />
                   <Tooltip
                     contentStyle={{
@@ -280,7 +213,6 @@ export default function ReportsPage() {
                   <Bar dataKey="purchases" fill="var(--color-chart-4)" />
                 </BarChart>
               </ResponsiveContainer>
-<<<<<<< HEAD
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   No purchase data available
@@ -334,16 +266,11 @@ export default function ReportsPage() {
                   No revenue data available
                 </div>
               )}
-=======
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
-<<<<<<< HEAD
   );
-=======
-  )
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 }
+

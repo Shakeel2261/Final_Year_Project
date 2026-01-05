@@ -1,16 +1,32 @@
 "use client";
 
+import { useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { products as allProducts, categories } from "@/lib/data";
 import { ProductGrid } from "@/components/product-grid";
 import { ProductList } from "@/components/product-list";
 import { useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Filter, X, Grid, List } from "lucide-react";
+import { Filter, X, Grid, List, Loader2 } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchProducts } from "@/lib/store/slices/productsSlice";
+import { fetchCategories } from "@/lib/store/slices/categoriesSlice";
 
 export default function ProductsPage() {
+  const dispatch = useAppDispatch();
+  const { items: allProducts, loading: productsLoading } = useAppSelector(
+    (state) => state.products
+  );
+  const { items: categories, loading: categoriesLoading } = useAppSelector(
+    (state) => state.categories
+  );
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+    dispatch(fetchCategories());
+  }, [dispatch]);
+
   const params = useSearchParams();
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -20,11 +36,26 @@ export default function ProductsPage() {
 
   const filtered = useMemo(() => {
     return allProducts.filter((p) => {
-      const matchesCategory = category ? p.category === category : true;
-      const matchesQ = q ? p.name.toLowerCase().includes(q) : true;
-      return matchesCategory && matchesQ;
+      const categoryId = typeof p.category === "object" ? p.category._id : p.category;
+      const categoryName = typeof p.category === "object" ? p.category.name : "";
+      const categorySlug = typeof p.category === "object" 
+        ? (p.category.name?.toLowerCase().replace(/\s+/g, '-') || categoryId)
+        : categoryId;
+      
+      const matchesCategory = 
+        !category || 
+        categoryId === category || 
+        categoryName === category ||
+        categorySlug === category;
+      
+      const matchesQ = 
+        !q || 
+        (p.productName || "").toLowerCase().includes(q) ||
+        (p.productCode || "").toLowerCase().includes(q);
+      
+      return matchesCategory && matchesQ && p.status === "active";
     });
-  }, [category, q]);
+  }, [allProducts, category, q]);
 
   const clearFilters = () => {
     const next = new URLSearchParams(params.toString());
@@ -34,7 +65,10 @@ export default function ProductsPage() {
   };
 
   const activeCategoryName = category
-    ? categories.find((c) => c.slug === category)?.name
+    ? categories.find((c) => {
+        const cSlug = c.slug || c.name?.toLowerCase().replace(/\s+/g, '-') || c._id;
+        return cSlug === category || c._id === category || c.name === category;
+      })?.name || "All"
     : "All";
 
   return (
@@ -101,25 +135,33 @@ export default function ProductsPage() {
                   >
                     All
                   </Button>
-                  {categories.map((c) => (
-                    <Button
-                      key={c.id}
-                      size="sm"
-                      variant={category === c.slug ? "default" : "outline"}
-                      onClick={() => {
-                        const next = new URLSearchParams(params.toString());
-                        next.set("category", c.slug);
-                        router.push(`/products?${next.toString()}`);
-                      }}
-                      className={
-                        category === c.slug
-                          ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0"
-                          : "bg-white/80 backdrop-blur-sm border-2 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-blue-300 transition-all duration-200 hover:scale-105"
-                      }
-                    >
-                      {c.name}
-                    </Button>
-                  ))}
+                  {categoriesLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : (
+                    categories.map((c) => {
+                      const cSlug = c.slug || c.name?.toLowerCase().replace(/\s+/g, '-') || c._id;
+                      const isActive = category === cSlug || category === c._id || category === c.name;
+                      return (
+                        <Button
+                          key={c._id}
+                          size="sm"
+                          variant={isActive ? "default" : "outline"}
+                          onClick={() => {
+                            const next = new URLSearchParams(params.toString());
+                            next.set("category", cSlug);
+                            router.push(`/products?${next.toString()}`);
+                          }}
+                          className={
+                            isActive
+                              ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0"
+                              : "bg-white/80 backdrop-blur-sm border-2 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-blue-300 transition-all duration-200 hover:scale-105"
+                          }
+                        >
+                          {c.name}
+                        </Button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -158,7 +200,11 @@ export default function ProductsPage() {
       {/* Products Display */}
       <section className="pb-16">
         <div className="mx-auto max-w-7xl px-4">
-          {filtered.length > 0 ? (
+          {productsLoading ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filtered.length > 0 ? (
             <>
               {/* View Mode Toggle Info */}
               <div className="mb-6 flex items-center justify-between">

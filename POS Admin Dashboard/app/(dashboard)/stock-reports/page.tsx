@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,81 +42,135 @@ import {
   Bell,
   ShoppingCart,
   ArrowUpDown,
+  Loader2,
 } from "lucide-react";
-import {
-  initialProducts,
-  initialStockMovements,
-  initialStockAlerts,
-  initialStockHistory,
-  initialReorderSuggestions,
-  calculateInventoryValue,
-  getLowStockProducts,
-  getOutOfStockProducts,
-  type Product,
-  type StockMovement,
-  type StockAlert,
-  type StockHistory,
-  type ReorderSuggestion,
-} from "@/lib/mock-data";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
+import { fetchProducts } from "@/lib/store/slices/productsSlice";
+import type { Product } from "@/lib/store/slices/productsSlice";
+
+interface StockAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  currentStock: number;
+  minStock: number;
+  urgency: "critical" | "high" | "medium" | "low";
+  status: "active" | "resolved";
+}
+
+interface ReorderSuggestion {
+  productId: string;
+  productName: string;
+  sku: string;
+  currentStock: number;
+  recommendedQuantity: number;
+  urgency: "critical" | "high" | "medium" | "low";
+}
 
 export default function StockReportsPage() {
-  const [products] = useState<Product[]>(initialProducts);
-  const [stockMovements, setStockMovements] = useState<StockMovement[]>(
-    initialStockMovements
-  );
-  const [stockAlerts, setStockAlerts] =
-    useState<StockAlert[]>(initialStockAlerts);
-  const [stockHistory] = useState<StockHistory[]>(initialStockHistory);
-  const [reorderSuggestions] = useState<ReorderSuggestion[]>(
-    initialReorderSuggestions
-  );
+  const dispatch = useAppDispatch();
+  const { items: products, loading } = useAppSelector((state) => state.products);
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterUrgency, setFilterUrgency] = useState<string>("all");
 
-  // Calculate key metrics
-  const inventoryValue = useMemo(
-    () => calculateInventoryValue(products),
-    [products]
-  );
-  const lowStockProducts = useMemo(
-    () => getLowStockProducts(products, 10),
-    [products]
-  );
-  const outOfStockProducts = useMemo(
-    () => getOutOfStockProducts(products),
-    [products]
-  );
+  // Calculate key metrics from products
+  const inventoryValue = useMemo(() => {
+    return products.reduce((total, product) => {
+      const stock = product.stockQuantity || 0;
+      const price = product.price || 0;
+      return total + stock * price;
+    }, 0);
+  }, [products]);
+
+  const lowStockProducts = useMemo(() => {
+    return products.filter((product) => {
+      const stock = product.stockQuantity || 0;
+      return stock > 0 && stock <= 10;
+    });
+  }, [products]);
+
+  const outOfStockProducts = useMemo(() => {
+    return products.filter((product) => {
+      const stock = product.stockQuantity || 0;
+      return stock === 0;
+    });
+  }, [products]);
+
+  const stockAlerts: StockAlert[] = useMemo(() => {
+    return products
+      .filter((product) => {
+        const stock = product.stockQuantity || 0;
+        return stock <= 10; // Consider low stock as alert
+      })
+      .map((product) => {
+        const stock = product.stockQuantity || 0;
+        let urgency: "critical" | "high" | "medium" | "low" = "low";
+        if (stock === 0) urgency = "critical";
+        else if (stock <= 3) urgency = "high";
+        else if (stock <= 5) urgency = "medium";
+
+        return {
+          id: product._id,
+          productId: product._id,
+          productName: product.productName || "Unnamed",
+          currentStock: stock,
+          minStock: 10,
+          urgency,
+          status: "active" as const,
+        };
+      });
+  }, [products]);
+
+  const reorderSuggestions: ReorderSuggestion[] = useMemo(() => {
+    return products
+      .filter((product) => {
+        const stock = product.stockQuantity || 0;
+        return stock <= 10;
+      })
+      .map((product) => {
+        const stock = product.stockQuantity || 0;
+        let urgency: "critical" | "high" | "medium" | "low" = "low";
+        if (stock === 0) urgency = "critical";
+        else if (stock <= 3) urgency = "high";
+        else if (stock <= 5) urgency = "medium";
+
+        return {
+          productId: product._id,
+          productName: product.productName || "Unnamed",
+          sku: product.productCode || "N/A",
+          currentStock: stock,
+          recommendedQuantity: Math.max(20 - stock, 10),
+          urgency,
+        };
+      });
+  }, [products]);
+
   const totalProducts = products.length;
-  const activeAlerts = stockAlerts.filter(
-    (alert) => alert.status === "active"
-  ).length;
+  const activeAlerts = stockAlerts.length;
 
   // Filter functions
-  const filteredMovements = useMemo(() => {
-    return stockMovements.filter((movement) => {
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
       const matchesSearch =
         searchQuery.trim() === "" ||
-        movement.productName
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        movement.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        movement.reason.toLowerCase().includes(searchQuery.toLowerCase());
+        (product.productName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.productCode || "").toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesType = filterType === "all" || movement.type === filterType;
-
-      return matchesSearch && matchesType;
+      return matchesSearch;
     });
-  }, [stockMovements, searchQuery, filterType]);
+  }, [products, searchQuery]);
 
   const filteredReorderSuggestions = useMemo(() => {
     return reorderSuggestions.filter((suggestion) => {
       const matchesSearch =
         searchQuery.trim() === "" ||
-        suggestion.productName
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
+        suggestion.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         suggestion.sku.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesUrgency =
@@ -141,31 +195,10 @@ export default function StockReportsPage() {
     }
   };
 
-  const getMovementTypeColor = (type: StockMovement["type"]) => {
-    switch (type) {
-      case "in":
-        return "bg-green-100 text-green-700";
-      case "out":
-        return "bg-red-100 text-red-700";
-      case "adjustment":
-        return "bg-blue-100 text-blue-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
   const resolveAlert = (alertId: string) => {
-    setStockAlerts((prev) =>
-      prev.map((alert) =>
-        alert.id === alertId
-          ? {
-              ...alert,
-              status: "resolved" as const,
-              resolvedAt: new Date().toISOString().slice(0, 10),
-            }
-          : alert
-      )
-    );
+    // Alert resolution would be handled by updating product stock
+    // This is a placeholder for future implementation
+    console.log("Resolve alert:", alertId);
   };
 
   return (
@@ -180,8 +213,17 @@ export default function StockReportsPage() {
             <Download className="h-4 w-4 mr-2" />
             Export Report
           </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => dispatch(fetchProducts())}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
             Refresh Data
           </Button>
         </div>
@@ -265,22 +307,25 @@ export default function StockReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {lowStockProducts.slice(0, 5).map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex justify-between items-center p-2 border rounded"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.sku}
-                        </p>
+                  {lowStockProducts.slice(0, 5).map((product) => {
+                    const stock = product.stockQuantity || 0;
+                    return (
+                      <div
+                        key={product._id}
+                        className="flex justify-between items-center p-2 border rounded"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{product.productName || "Unnamed"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {product.productCode || "N/A"}
+                          </p>
+                        </div>
+                        <Badge variant="destructive" className="text-xs">
+                          {stock} left
+                        </Badge>
                       </div>
-                      <Badge variant="destructive" className="text-xs">
-                        {product.stock} left
-                      </Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {lowStockProducts.length === 0 && (
                     <p className="text-center text-muted-foreground py-4">
                       No low stock items
@@ -302,13 +347,13 @@ export default function StockReportsPage() {
                 <div className="space-y-2">
                   {outOfStockProducts.slice(0, 5).map((product) => (
                     <div
-                      key={product.id}
+                      key={product._id}
                       className="flex justify-between items-center p-2 border rounded"
                     >
                       <div>
-                        <p className="font-medium text-sm">{product.name}</p>
+                        <p className="font-medium text-sm">{product.productName || "Unnamed"}</p>
                         <p className="text-xs text-muted-foreground">
-                          {product.sku}
+                          {product.productCode || "N/A"}
                         </p>
                       </div>
                       <Badge variant="destructive" className="text-xs">
@@ -348,48 +393,19 @@ export default function StockReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockMovements.slice(0, 10).map((movement) => (
-                      <TableRow key={movement.id}>
-                        <TableCell className="text-sm">
-                          {movement.date}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">
-                              {movement.productName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {movement.sku}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={getMovementTypeColor(movement.type)}
-                          >
-                            {movement.type.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={
-                              movement.type === "out"
-                                ? "text-red-600"
-                                : "text-green-600"
-                            }
-                          >
-                            {movement.type === "out" ? "-" : "+"}
-                            {movement.quantity}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {movement.reason}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {movement.user}
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Stock movements tracking requires backend API support. This feature will be available soon.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -438,21 +454,19 @@ export default function StockReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredMovements.map((movement) => (
-                      <TableRow key={movement.id}>
-                        <TableCell className="text-sm">
-                          {movement.date}
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">
-                              {movement.productName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {movement.sku}
-                            </p>
-                          </div>
+                      </TableRow>
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          Stock movements tracking requires backend API support. This feature will be available soon.
                         </TableCell>
+                      </TableRow>
+                    )}
                         <TableCell>
                           <Badge
                             className={getMovementTypeColor(movement.type)}
@@ -695,47 +709,19 @@ export default function StockReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockHistory.slice(0, 20).map((history) => (
-                      <TableRow key={history.id}>
-                        <TableCell className="text-sm">
-                          {history.date}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">
-                              {history.productName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {history.sku}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {history.openingStock}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600">
-                          +{history.stockIn}
-                        </TableCell>
-                        <TableCell className="text-right text-red-600">
-                          -{history.stockOut}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={
-                              history.adjustments >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {history.adjustments >= 0 ? "+" : ""}
-                            {history.adjustments}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {history.closingStock}
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Stock history tracking requires backend API support. This feature will be available soon.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 "use client";
 
 import { useEffect } from "react";
@@ -26,7 +25,7 @@ export default function Home() {
           </h1>
           <p className="text-slate-600">
             Manage products, orders, customers, transactions, reports, and ledgers.
-        </p>
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/login">
@@ -38,30 +37,9 @@ export default function Home() {
             <Button variant="outline" className="px-8">
               Sign Up
             </Button>
-        </Link>
+          </Link>
         </div>
       </div>
     </main>
   );
-=======
-import Link from "next/link"
-
-export default function Home() {
-  return (
-    <main className="min-h-dvh grid place-items-center bg-background text-foreground">
-      <div className="text-center space-y-4">
-        <h1 className="text-3xl font-semibold text-balance">POS Admin Dashboard</h1>
-        <p className="text-muted-foreground">
-          Go to the dashboard to manage products, orders, customers, transactions, reports, and ledgers.
-        </p>
-        <Link
-          href="/overview"
-          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          Open Dashboard
-        </Link>
-      </div>
-    </main>
-  )
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
 }

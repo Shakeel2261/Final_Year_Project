@@ -1,6 +1,7 @@
 "use client"
 import useSWR, { mutate as globalMutate } from "swr"
-import { products } from "@/lib/data"
+import { useAppSelector } from "@/lib/store/hooks"
+import type { Product } from "@/lib/store/slices/productsSlice"
 
 export type CartItem = { productId: string; quantity: number }
 type Cart = CartItem[]
@@ -25,6 +26,7 @@ function writeToLocalStorage(cart: Cart) {
 const fetcher = async () => readFromLocalStorage()
 
 export function useCart() {
+  const { items: products } = useAppSelector((state) => state.products)
   const { data, mutate } = useSWR<Cart>(CART_KEY, fetcher, {
     fallbackData: [],
     revalidateOnFocus: false,
@@ -65,11 +67,27 @@ export function useCart() {
   const count = cart.reduce((acc, i) => acc + i.quantity, 0)
 
   const enriched = cart.map((i) => {
-    const prod = products.find((p) => p.id === i.productId)
-    return prod ? { ...i, product: prod } : i
-  }) as Array<CartItem & { product: (typeof products)[number] }>
+    const prod = products.find((p) => p._id === i.productId)
+    if (!prod) return null
+    // Map Redux product structure to cart product structure
+    return {
+      ...i,
+      product: {
+        _id: prod._id,
+        id: prod._id, // For backward compatibility
+        name: prod.productName,
+        productName: prod.productName,
+        price: prod.price || 0,
+        imageUrl: prod.imageUrl,
+        stock: prod.stockQuantity || 0,
+        stockQuantity: prod.stockQuantity || 0,
+        slug: prod.slug || prod._id,
+        description: prod.description,
+      } as Product & { id: string; name: string; stock: number },
+    }
+  }).filter((item): item is CartItem & { product: Product & { id: string; name: string; stock: number } } => item !== null)
 
-  const subtotal = enriched.reduce((acc, i) => acc + i.product.price * i.quantity, 0)
+  const subtotal = enriched.reduce((acc, i) => acc + (i.product.price || 0) * i.quantity, 0)
 
   return { cart, add, update, remove, clear, count, subtotal, items: enriched }
 }
