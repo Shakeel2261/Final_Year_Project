@@ -20,11 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
-<<<<<<< HEAD
     "puppeteer": "^24.22.3",
     "stripe": "^20.1.0"
-=======
-    "puppeteer": "^24.22.3"
->>>>>>> 5e646091a7dd403166d752bf1cab6d22bc306eab
   }
 }

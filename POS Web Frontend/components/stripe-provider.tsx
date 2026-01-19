@@ -12,3 +12,10 @@ export function StripeProvider({ children }: { children: ReactNode }) {
   return <Elements stripe={stripePromise}>{children}</Elements>;
 }
 
+
+
+
+
+
+
+
